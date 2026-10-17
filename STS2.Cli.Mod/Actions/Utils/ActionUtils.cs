@@ -83,6 +83,18 @@ public static class ActionUtils
     }
 
     /// <summary>
+    ///     True when the local player is in the manual play phase of their turn
+    ///     (<see cref="PlayerTurnPhase.Play" />) — the phase in which cards and potions can be played.
+    ///     Replaces the removed <c>CombatManager.IsPlayPhase</c> (game v0.111.0 moved turn phase
+    ///     tracking onto <see cref="PlayerCombatState.Phase" />).
+    ///     Requires an active combat (caller should validate <see cref="CombatManager.IsInProgress" /> first).
+    /// </summary>
+    public static bool IsLocalPlayerInPlayPhase()
+    {
+        return GetLocalPlayer()?.PlayerCombatState?.Phase == PlayerTurnPhase.Play;
+    }
+
+    /// <summary>
     ///     Validates that combat is active and the player can act.
     ///     Checks: combat in progress, not ending, play phase, actions not disabled.
     ///     Returns an error response object if any check fails, or <c>null</c> if all pass.
@@ -96,7 +108,7 @@ public static class ActionUtils
         if (CombatManager.Instance.IsOverOrEnding)
             return new { ok = false, error = "COMBAT_ENDING", message = "Combat is over or ending" };
 
-        if (!CombatManager.Instance.IsPlayPhase)
+        if (!IsLocalPlayerInPlayPhase())
             return new { ok = false, error = "NOT_PLAYER_TURN", message = "Not in play phase" };
 
         if (CombatManager.Instance.PlayerActionsDisabled)

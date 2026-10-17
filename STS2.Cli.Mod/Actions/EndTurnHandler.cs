@@ -56,8 +56,9 @@ public static class EndTurnHandler
 
             void OnTurnStarted(CombatState _)
             {
-                // Only resolve when it's the player's play phase again
-                if (CombatManager.Instance.IsPlayPhase)
+                // TurnStarted fires for both sides; only resolve when control has
+                // returned to the player's side (the enemy turn has completed).
+                if (CombatManager.Instance.IsPartOfPlayerTurn(player))
                     tcs.TrySetResult("turn_started");
             }
 

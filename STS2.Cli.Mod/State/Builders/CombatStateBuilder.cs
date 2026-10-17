@@ -2,6 +2,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
+using STS2.Cli.Mod.Actions.Utils;
 using STS2.Cli.Mod.Models.State;
 using STS2.Cli.Mod.Utils;
 using static STS2.Cli.Mod.Utils.TextUtils;
@@ -40,7 +41,7 @@ public static class CombatStateBuilder
         {
             Encounter = combatState.Encounter?.Id.Entry,
             TurnNumber = combatState.RoundNumber,
-            IsPlayerTurn = combatManager.IsPlayPhase,
+            IsPlayerTurn = ActionUtils.IsLocalPlayerInPlayPhase(),
             IsPlayerActionsDisabled = combatManager.PlayerActionsDisabled,
             IsCombatEnding = combatManager.IsOverOrEnding
         };
