@@ -21,18 +21,36 @@ internal static class StateCommand
             DefaultValueFactory = _ => false
         };
 
+        var waitOption = new Option<bool>("--wait")
+        {
+            Description = "Wait until the game is no longer busy (is_busy=false) before returning state",
+            DefaultValueFactory = _ => false
+        };
+
+        var waitTimeoutOption = new Option<int>("--wait-timeout")
+        {
+            Description = "Timeout in milliseconds for --wait (default 10000)",
+            DefaultValueFactory = _ => 10000
+        };
+
         command.Options.Add(includePileDetailsOption);
+        command.Options.Add(waitOption);
+        command.Options.Add(waitTimeoutOption);
 
         command.SetAction(parseResult =>
         {
             var pretty = CommandExecutor.IsPretty(parseResult);
             var includePileDetails = parseResult.GetValue(includePileDetailsOption);
+            var wait = parseResult.GetValue(waitOption);
+            var waitTimeout = parseResult.GetValue(waitTimeoutOption);
 
             return CommandExecutor.ExecuteAsync(
                 () => new Request
                 {
                     Cmd = "state",
-                    IncludePileDetails = includePileDetails
+                    IncludePileDetails = includePileDetails,
+                    WaitStable = wait,
+                    WaitTimeoutMs = waitTimeout
                 },
                 pretty);
         });

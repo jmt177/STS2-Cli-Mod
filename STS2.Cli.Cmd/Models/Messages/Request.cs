@@ -80,4 +80,17 @@ public class Request
     /// </summary>
     [JsonPropertyName("include_pile_details")]
     public bool IncludePileDetails { get; set; }
+
+    /// <summary>
+    ///     When true, the 'state' command polls until the game is no longer busy
+    ///     (<c>is_busy == false</c>) before returning, up to <see cref="WaitTimeoutMs" />.
+    /// </summary>
+    [JsonPropertyName("wait_stable")]
+    public bool WaitStable { get; set; }
+
+    /// <summary>
+    ///     Timeout in milliseconds for <see cref="WaitStable" />. Defaults to 10000 when unset or &lt;= 0.
+    /// </summary>
+    [JsonPropertyName("wait_timeout_ms")]
+    public int? WaitTimeoutMs { get; set; }
 }

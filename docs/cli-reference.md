@@ -30,13 +30,34 @@ Test connection. Returns `{"ok": true}`.
 #### state
 
 ```
-./sts2 state [--include-pile-details]
+./sts2 state [--include-pile-details] [--wait] [--wait-timeout <ms>]
 ```
 
 Get full game state. See [Game State Structure](#game-state-structure) below.
 
 **Options:**
 - `--include-pile-details` — Include full card descriptions in draw/discard/exhaust pile listings. Default is off to reduce payload size.
+- `--wait` — Block until the game is no longer busy (`is_busy` is `false`) before returning, so the state reflects a settled world. If the timeout elapses first, the state is returned anyway with a `warning` field and `is_busy` still `true`.
+- `--wait-timeout <ms>` — Timeout for `--wait`, in milliseconds. Default `10000`.
+
+See [State Synchronization](#state-synchronization) for the recommended action loop.
+
+#### State Synchronization
+
+Every `state` response carries two fields for pacing an automated loop:
+
+- `state_version` — a monotonic integer that increments **only when the observable state changes** between two `state` reads. It is not a frame counter: a settled game returns the same value on repeated calls. Compare it before and after an action to tell whether anything actually changed.
+- `is_busy` — `true` while the game is mid-transition or still resolving a previous action: room/loading transitions during a run, combat while it is not the player's play phase or player actions are disabled (enemy turn, animations, queued card effects), and map travel animations. It is `false` on every click-driven screen (events, shop, rest, rewards, card/relic/bundle selection), whose actions are always safe to issue when that screen is shown.
+
+Recommended loop:
+
+```
+1. sts2 <action ...>            # issue one action
+2. sts2 state --wait            # block until is_busy == false, then read
+3. act on the returned state; optionally diff state_version against the pre-action value
+```
+
+`state --wait` performs step 2's polling inside the mod so the caller does not have to. Action handlers (`play_card`, `end_turn`, `choose_map_node`, menu/embark/reward navigation, ...) already block until their own transition completes, so `--wait` is mainly a safety net for animations that outlive the handler and for screens without a dedicated wait.
 
 #### view_deck
 
@@ -428,7 +449,16 @@ data
 │                       # BUNDLE_SELECT | CRYSTAL_SPHERE
 │                       # GAME_OVER | UNKNOWN
 ├── timestamp           # Unix ms
+├── state_version       # int, monotonic; increments only when observable state changes
+├── is_busy             # bool, true while the game is mid-transition / resolving an action
 ├── error               # string?, error message if state extraction failed
+│
+├── player              # Populated on all in-run screens (null in menus / character select).
+│   │                   # Run-scoped: hp, max_hp, block, gold, deck_count, relics[], potions[],
+│   │                   # powers[], character_id, character_name, max_energy.
+│   └──                 # Combat-scoped fields (energy, hand/draw/discard/exhaust counts,
+│                       # orbs, stars, pets) are zero/null outside combat.
+│                       # During combat this equals combat.player.
 │
 ├── menu                      # Only when screen is MENU
 │   └── has_run_save        # bool, true if a saved run exists (continue_run available)
