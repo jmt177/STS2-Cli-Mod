@@ -103,16 +103,16 @@ public static class ActionUtils
     public static object? ValidateCombatReady()
     {
         if (!CombatManager.Instance.IsInProgress)
-            return new { ok = false, error = "NOT_IN_COMBAT", message = "Not currently in combat" };
+            return Responses.Error("NOT_IN_COMBAT", "Not currently in combat");
 
         if (CombatManager.Instance.IsOverOrEnding)
-            return new { ok = false, error = "COMBAT_ENDING", message = "Combat is over or ending" };
+            return Responses.Error("COMBAT_ENDING", "Combat is over or ending");
 
         if (!IsLocalPlayerInPlayPhase())
-            return new { ok = false, error = "NOT_PLAYER_TURN", message = "Not in play phase" };
+            return Responses.Error("NOT_PLAYER_TURN", "Not in play phase");
 
         if (CombatManager.Instance.PlayerActionsDisabled)
-            return new { ok = false, error = "ACTIONS_DISABLED", message = "Player actions are currently disabled" };
+            return Responses.Error("ACTIONS_DISABLED", "Player actions are currently disabled");
 
         return null;
     }
@@ -224,29 +224,17 @@ public static class ActionUtils
         {
             case TargetType.AnyEnemy:
                 if (targetCombatId == null)
-                    return (null, new
-                    {
-                        ok = false, error = "TARGET_REQUIRED",
-                        message = $"'{itemTitle}' requires a target. Provide 'target' with an enemy combat_id."
-                    });
+                    return (null, Responses.Error("TARGET_REQUIRED", $"'{itemTitle}' requires a target. Provide 'target' with an enemy combat_id."));
 
                 var enemy = ResolveEnemyTarget((uint)targetCombatId.Value);
                 if (enemy == null)
-                    return (null, new
-                    {
-                        ok = false, error = "TARGET_NOT_FOUND",
-                        message = $"No hittable enemy found with combat_id {targetCombatId}"
-                    });
+                    return (null, Responses.Error("TARGET_NOT_FOUND", $"No hittable enemy found with combat_id {targetCombatId}"));
 
                 return (enemy, null);
 
             case TargetType.Self:
                 if (targetCombatId != null)
-                    return (null, new
-                    {
-                        ok = false, error = "TARGET_NOT_ALLOWED",
-                        message = $"'{itemTitle}' is self-targeting and does not accept a target"
-                    });
+                    return (null, Responses.Error("TARGET_NOT_ALLOWED", $"'{itemTitle}' is self-targeting and does not accept a target"));
 
                 // Pass null for Self-targeting cards. The game's IsValidTarget()
                 // returns false when a non-null creature is provided for non-AnyEnemy
@@ -261,22 +249,14 @@ public static class ActionUtils
 
                 var ally = ResolveAllyTarget(player, (uint)targetCombatId.Value);
                 if (ally == null)
-                    return (null, new
-                    {
-                        ok = false, error = "TARGET_NOT_FOUND",
-                        message = $"No ally found with combat_id {targetCombatId}. Must be the player or a pet."
-                    });
+                    return (null, Responses.Error("TARGET_NOT_FOUND", $"No ally found with combat_id {targetCombatId}. Must be the player or a pet."));
 
                 return (ally, null);
 
             default:
                 // AllEnemies, AllAllies, None, RandomEnemy, TargetedNoCreature, Osty — no target needed
                 if (targetCombatId != null)
-                    return (null, new
-                    {
-                        ok = false, error = "TARGET_NOT_ALLOWED",
-                        message = $"'{itemTitle}' has target type '{targetType}' and does not accept a target"
-                    });
+                    return (null, Responses.Error("TARGET_NOT_ALLOWED", $"'{itemTitle}' has target type '{targetType}' and does not accept a target"));
 
                 return (null, null);
         }

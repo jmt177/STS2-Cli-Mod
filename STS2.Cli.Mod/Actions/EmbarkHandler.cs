@@ -37,12 +37,7 @@ public static class EmbarkHandler
         if (screen == null)
         {
             Logger.Warning("Embark requested but not on character select screen");
-            return new
-            {
-                ok = false,
-                error = "NOT_IN_CHARACTER_SELECT",
-                message = "Not on character select screen"
-            };
+            return Responses.Error("NOT_IN_CHARACTER_SELECT", "Not on character select screen");
         }
 
         // Check if a character is selected
@@ -50,12 +45,7 @@ public static class EmbarkHandler
         if (selectedBtn == null)
         {
             Logger.Warning("Embark requested but no character selected");
-            return new
-            {
-                ok = false,
-                error = "NO_CHARACTER_SELECTED",
-                message = "No character selected"
-            };
+            return Responses.Error("NO_CHARACTER_SELECTED", "No character selected");
         }
 
         // Find embark button
@@ -63,24 +53,14 @@ public static class EmbarkHandler
         if (embarkBtn == null)
         {
             Logger.Error("Embark button not found");
-            return new
-            {
-                ok = false,
-                error = "EMBARK_BUTTON_NOT_FOUND",
-                message = "Embark button not found"
-            };
+            return Responses.Error("EMBARK_BUTTON_NOT_FOUND", "Embark button not found");
         }
 
         // Check if the button is enabled
         if (!embarkBtn.IsEnabled)
         {
             Logger.Warning("Embark button is disabled");
-            return new
-            {
-                ok = false,
-                error = "EMBARK_NOT_AVAILABLE",
-                message = "Embark button is not available"
-            };
+            return Responses.Error("EMBARK_NOT_AVAILABLE", "Embark button is not available");
         }
 
         // Click embark via ForceClick, which emits the Released signal
@@ -98,12 +78,7 @@ public static class EmbarkHandler
         if (!screenReady)
         {
             Logger.Warning("Timed out waiting for map or event screen after embark");
-            return new
-            {
-                ok = true,
-                data = new { embarked = true },
-                warning = "Timed out waiting for destination screen"
-            };
+            return Responses.Ok(new { embarked = true }, "Timed out waiting for destination screen");
         }
 
         // Detect which screen we landed on
@@ -111,10 +86,6 @@ public static class EmbarkHandler
             ? "EVENT"
             : "MAP";
         Logger.Info($"Embark completed, landed on {screen_name} screen");
-        return new
-        {
-            ok = true,
-            data = new { embarked = true, screen = screen_name }
-        };
+        return Responses.Ok(new { embarked = true, screen = screen_name });
     }
 }

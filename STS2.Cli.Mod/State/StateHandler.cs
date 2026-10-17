@@ -53,16 +53,12 @@ public static class StateHandler
         var state = GetState(request.IncludePileDetails);
 
         if (state.Error != null)
-            return new { ok = false, error = "STATE_EXTRACTION_ERROR", message = state.Error };
+            return Responses.Error("STATE_EXTRACTION_ERROR", state.Error);
 
         if (!settled)
-            return new
-            {
-                ok = true, data = state,
-                warning = "Timed out waiting for the game to settle (is_busy is still true)"
-            };
+            return Responses.Ok(state, "Timed out waiting for the game to settle (is_busy is still true)");
 
-        return new { ok = true, data = state };
+        return Responses.Ok(state);
     }
 
     /// <summary>

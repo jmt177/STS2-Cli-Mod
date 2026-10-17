@@ -45,7 +45,7 @@ public static class EndTurnHandler
             // Get player
             var player = ActionUtils.GetLocalPlayer();
             if (player == null)
-                return new { ok = false, error = "NO_PLAYER", message = "Player not found" };
+                return Responses.Error("NO_PLAYER", "Player not found");
 
             // --- Snapshot history and end turn ---
 
@@ -82,7 +82,7 @@ public static class EndTurnHandler
                 if (completedTask != tcs.Task)
                 {
                     Logger.Warning("EndTurn timed out waiting for enemy turn to complete");
-                    return new { ok = false, error = "TIMEOUT", message = "Enemy turn did not complete in time" };
+                    return Responses.Error("TIMEOUT", "Enemy turn did not complete in time");
                 }
 
                 var reason = tcs.Task.Result;
@@ -93,16 +93,12 @@ public static class EndTurnHandler
                 var results = CombatHistoryUtils.BuildFromHistory(historyBefore);
                 Logger.Info($"EndTurn completed with {results.Count} result entries");
 
-                return new
+                return Responses.Ok(new
                 {
-                    ok = true,
-                    data = new
-                    {
-                        action = "END_TURN",
-                        reason,
-                        results
-                    }
-                };
+                    action = "END_TURN",
+                    reason,
+                    results
+                });
             }
             finally
             {
@@ -114,7 +110,7 @@ public static class EndTurnHandler
         catch (Exception ex)
         {
             Logger.Error($"Failed to end turn: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 }

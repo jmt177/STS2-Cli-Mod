@@ -33,7 +33,7 @@ public static class RewardClaimHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.RewardType))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Reward type required (--type)" };
+            return Responses.Error("MISSING_ARGUMENT", "Reward type required (--type)");
 
         var nthValue = request.Nth ?? 0;
         Logger.Info($"Requested to claim reward: type={request.RewardType}, id={request.Id ?? "null"}, nth={nthValue}");
@@ -48,7 +48,7 @@ public static class RewardClaimHandler
 
             var screen = UiUtils.FindScreenInOverlay<NRewardsScreen>();
             if (screen == null)
-                return new { ok = false, error = "NOT_ON_REWARD_SCREEN", message = "Reward screen is not active" };
+                return Responses.Error("NOT_ON_REWARD_SCREEN", "Reward screen is not active");
 
             var rewardButtons = UiUtils.FindRewardButtons(screen);
 
@@ -73,44 +73,24 @@ public static class RewardClaimHandler
 
             // If only one matching reward, nth must be 0
             if (matchingRewards.Count == 1 && nth != 0)
-                return new
-                {
-                    ok = false,
-                    error = "AMBIGUOUS_REWARD",
-                    message =
-                        $"Only one {rewardType} reward available, but nth={nth} was specified. Use nth=0 or omit --nth."
-                };
+                return Responses.Error("AMBIGUOUS_REWARD", $"Only one {rewardType} reward available, but nth={nth} was specified. Use nth=0 or omit --nth.");
 
             // If multiple matching rewards, nth is required to be specified (or defaults to 0)
             if (nth < 0 || nth >= matchingRewards.Count)
             {
                 var idPart = itemId != null ? $" with ID '{itemId}'" : "";
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_REWARD_INDEX",
-                    message =
-                        $"{rewardType}{idPart} has {matchingRewards.Count} copies. Use nth from 0 to {matchingRewards.Count - 1}."
-                };
+                return Responses.Error("INVALID_REWARD_INDEX", $"{rewardType}{idPart} has {matchingRewards.Count} copies. Use nth from 0 to {matchingRewards.Count - 1}.");
             }
 
             var (rewardButton, reward) = matchingRewards[nth];
 
             // Card rewards must use choose_card / skip_card commands
             if (reward is CardReward)
-                return new
-                {
-                    ok = false, error = "USE_CHOOSE_CARD",
-                    message = "Card rewards must be claimed with choose_card or skipped with skip_card"
-                };
+                return Responses.Error("USE_CHOOSE_CARD", "Card rewards must be claimed with choose_card or skipped with skip_card");
 
             // CardRemovalReward not supported yet
             if (reward is CardRemovalReward)
-                return new
-                {
-                    ok = false, error = "NOT_SUPPORTED",
-                    message = "Card removal reward is not yet supported"
-                };
+                return Responses.Error("NOT_SUPPORTED", "Card removal reward is not yet supported");
 
             // --- Claim the reward via ForceClick ---
 
@@ -125,33 +105,25 @@ public static class RewardClaimHandler
             {
                 // Button still presents — claim likely failed (e.g., potion belt full)
                 if (reward is PotionReward)
-                    return new
-                    {
-                        ok = false, error = "POTION_BELT_FULL",
-                        message = "Cannot claim potion — potion belt is full"
-                    };
+                    return Responses.Error("POTION_BELT_FULL", "Cannot claim potion — potion belt is full");
 
-                return new { ok = false, error = "CLAIM_FAILED", message = "Reward claim was not successful" };
+                return Responses.Error("CLAIM_FAILED", "Reward claim was not successful");
             }
 
             Logger.Info($"Reward claimed successfully: {rewardTypeName}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    reward_type = rewardType,
-                    item_id = itemId,
-                    nth,
-                    claimed = true
-                }
-            };
+                reward_type = rewardType,
+                item_id = itemId,
+                nth,
+                claimed = true
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to claim reward: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

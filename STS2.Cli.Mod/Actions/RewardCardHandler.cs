@@ -46,13 +46,13 @@ public static class RewardCardHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.RewardType))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Reward type required (--type)" };
+            return Responses.Error("MISSING_ARGUMENT", "Reward type required (--type)");
 
         if (string.IsNullOrEmpty(request.CardId))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Card ID required (--card_id)" };
+            return Responses.Error("MISSING_ARGUMENT", "Card ID required (--card_id)");
 
         if (request.RewardType != "card")
-            return new { ok = false, error = "INVALID_REWARD_TYPE", message = "choose_card only supports --type card" };
+            return Responses.Error("INVALID_REWARD_TYPE", "choose_card only supports --type card");
 
         var nth = request.Nth ?? 0;
         var rewardType = request.RewardType;
@@ -66,22 +66,17 @@ public static class RewardCardHandler
 
             var screen = UiUtils.FindScreenInOverlay<NRewardsScreen>();
             if (screen == null)
-                return new { ok = false, error = "NOT_ON_REWARD_SCREEN", message = "Reward screen is not active" };
+                return Responses.Error("NOT_ON_REWARD_SCREEN", "Reward screen is not active");
 
             // Find all card rewards
             var cardRewards = FindCardRewards(screen);
 
             if (cardRewards.Count == 0)
-                return new { ok = false, error = "REWARD_NOT_FOUND", message = "No card rewards available" };
+                return Responses.Error("REWARD_NOT_FOUND", "No card rewards available");
 
             // If multiple card rewards exist and nth is out of range
             if (nth < 0 || nth >= cardRewards.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_REWARD_INDEX",
-                    message = $"Card reward count: {cardRewards.Count}. Use nth from 0 to {cardRewards.Count - 1}."
-                };
+                return Responses.Error("INVALID_REWARD_INDEX", $"Card reward count: {cardRewards.Count}. Use nth from 0 to {cardRewards.Count - 1}.");
 
             var (rewardButton, cardReward) = cardRewards[nth];
 
@@ -90,12 +85,7 @@ public static class RewardCardHandler
             if (targetCard == null)
             {
                 var availableCards = string.Join(", ", cardReward.Cards.Select(c => c.Id.Entry));
-                return new
-                {
-                    ok = false,
-                    error = "CARD_NOT_FOUND",
-                    message = $"Card '{cardId}' not found in reward. Available: [{availableCards}]"
-                };
+                return Responses.Error("CARD_NOT_FOUND", $"Card '{cardId}' not found in reward. Available: [{availableCards}]");
             }
 
             // --- Open the card reward selection screen via ForceClick ---
@@ -106,11 +96,7 @@ public static class RewardCardHandler
             // Wait for NCardRewardSelectionScreen to appear
             var cardScreen = await WaitForCardRewardScreen();
             if (cardScreen == null)
-                return new
-                {
-                    ok = false, error = "TIMEOUT",
-                    message = "Card reward selection screen did not open in time"
-                };
+                return Responses.Error("TIMEOUT", "Card reward selection screen did not open in time");
 
             // Wait for cards to become clickable
             await Task.Delay(CardEnableDelayMs);
@@ -121,11 +107,7 @@ public static class RewardCardHandler
             var targetHolder = FindCardHolderById(cardHolders, cardId);
 
             if (targetHolder == null)
-                return new
-                {
-                    ok = false, error = "CARD_NOT_FOUND",
-                    message = $"Card '{cardId}' not found on the selection screen"
-                };
+                return Responses.Error("CARD_NOT_FOUND", $"Card '{cardId}' not found on the selection screen");
 
             // Get card info before selecting (for response)
             var cardModel = targetHolder.CardModel;
@@ -144,22 +126,18 @@ public static class RewardCardHandler
 
             Logger.Info($"Card '{selectedCardId}' selected successfully");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    reward_type = rewardType,
-                    nth,
-                    card_id = selectedCardId,
-                    card_name = cardName
-                }
-            };
+                reward_type = rewardType,
+                nth,
+                card_id = selectedCardId,
+                card_name = cardName
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to choose card: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -170,10 +148,10 @@ public static class RewardCardHandler
     public static async Task<object> ExecuteSkipAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.RewardType))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Reward type required (--type)" };
+            return Responses.Error("MISSING_ARGUMENT", "Reward type required (--type)");
 
         if (request.RewardType != "card")
-            return new { ok = false, error = "INVALID_REWARD_TYPE", message = "skip_card only supports --type card" };
+            return Responses.Error("INVALID_REWARD_TYPE", "skip_card only supports --type card");
 
         var nth = request.Nth ?? 0;
         var rewardType = request.RewardType;
@@ -186,21 +164,16 @@ public static class RewardCardHandler
 
             var screen = UiUtils.FindScreenInOverlay<NRewardsScreen>();
             if (screen == null)
-                return new { ok = false, error = "NOT_ON_REWARD_SCREEN", message = "Reward screen is not active" };
+                return Responses.Error("NOT_ON_REWARD_SCREEN", "Reward screen is not active");
 
             // Find all card rewards
             var cardRewards = FindCardRewards(screen);
 
             if (cardRewards.Count == 0)
-                return new { ok = false, error = "REWARD_NOT_FOUND", message = "No card rewards available" };
+                return Responses.Error("REWARD_NOT_FOUND", "No card rewards available");
 
             if (nth < 0 || nth >= cardRewards.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_REWARD_INDEX",
-                    message = $"Card reward count: {cardRewards.Count}. Use nth from 0 to {cardRewards.Count - 1}."
-                };
+                return Responses.Error("INVALID_REWARD_INDEX", $"Card reward count: {cardRewards.Count}. Use nth from 0 to {cardRewards.Count - 1}.");
 
             var (rewardButton, _) = cardRewards[nth];
 
@@ -212,11 +185,7 @@ public static class RewardCardHandler
             // Wait for NCardRewardSelectionScreen to appear
             var cardScreen = await WaitForCardRewardScreen();
             if (cardScreen == null)
-                return new
-                {
-                    ok = false, error = "TIMEOUT",
-                    message = "Card reward selection screen did not open in time"
-                };
+                return Responses.Error("TIMEOUT", "Card reward selection screen did not open in time");
 
             // Wait for UI to settle
             await Task.Delay(CardEnableDelayMs);
@@ -225,11 +194,7 @@ public static class RewardCardHandler
 
             var altButtons = FindAlternativeButtons(cardScreen);
             if (altButtons.Count == 0)
-                return new
-                {
-                    ok = false, error = "INTERNAL_ERROR",
-                    message = "No alternative buttons found on card reward screen"
-                };
+                return Responses.Error("INTERNAL_ERROR", "No alternative buttons found on card reward screen");
 
             var skipButton = altButtons[0];
 
@@ -243,21 +208,17 @@ public static class RewardCardHandler
 
             Logger.Info("Card reward skipped successfully");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    reward_type = rewardType,
-                    nth,
-                    skipped = true
-                }
-            };
+                reward_type = rewardType,
+                nth,
+                skipped = true
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to skip card reward: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

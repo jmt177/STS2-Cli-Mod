@@ -34,12 +34,7 @@ public static class SetAscensionHandler
         if (request.Args == null || request.Args.Length == 0)
         {
             Logger.Warning("set_ascension requested with no arguments");
-            return new
-            {
-                ok = false,
-                error = "MISSING_ARGUMENT",
-                message = "Ascension level is required (e.g., 'sts2 set_ascension 10')"
-            };
+            return Responses.Error("MISSING_ARGUMENT", "Ascension level is required (e.g., 'sts2 set_ascension 10')");
         }
 
         var level = request.Args[0];
@@ -50,12 +45,7 @@ public static class SetAscensionHandler
         if (screen == null)
         {
             Logger.Warning("SetAscension requested but not on character select screen");
-            return new
-            {
-                ok = false,
-                error = "NOT_IN_CHARACTER_SELECT",
-                message = "Not on character select screen"
-            };
+            return Responses.Error("NOT_IN_CHARACTER_SELECT", "Not on character select screen");
         }
 
         // Get ascension panel
@@ -63,12 +53,7 @@ public static class SetAscensionHandler
         if (ascensionPanel == null)
         {
             Logger.Error("Ascension panel not found");
-            return new
-            {
-                ok = false,
-                error = "UI_NOT_FOUND",
-                message = "Ascension panel not found"
-            };
+            return Responses.Error("UI_NOT_FOUND", "Ascension panel not found");
         }
 
         // Get max ascension from private field _maxAscension
@@ -77,23 +62,14 @@ public static class SetAscensionHandler
         if (level < 0 || level > maxAscension)
         {
             Logger.Warning($"Invalid ascension level: {level} (max: {maxAscension})");
-            return new
-            {
-                ok = false,
-                error = "INVALID_ASCENSION_LEVEL",
-                message = $"Ascension level must be between 0 and {maxAscension}"
-            };
+            return Responses.Error("INVALID_ASCENSION_LEVEL", $"Ascension level must be between 0 and {maxAscension}");
         }
 
         // SetAscensionLevel is a public method on NAscensionPanel
         Logger.Info($"Setting ascension level to: {level}");
         ascensionPanel.SetAscensionLevel(level);
 
-        return new
-        {
-            ok = true,
-            data = new { ascension_level = level }
-        };
+        return Responses.Ok(new { ascension_level = level });
     }
 
     /// <summary>

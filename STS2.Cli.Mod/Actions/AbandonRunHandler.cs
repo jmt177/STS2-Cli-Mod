@@ -40,10 +40,7 @@ public static class AbandonRunHandler
         if (currentScreen != "MENU")
         {
             Logger.Warning($"Cannot abandon run: not on menu screen (current: {currentScreen})");
-            return new
-            {
-                ok = false, error = "NOT_ON_MENU", message = $"Not on main menu screen (current: {currentScreen})"
-            };
+            return Responses.Error("NOT_ON_MENU", $"Not on main menu screen (current: {currentScreen})");
         }
 
         // Guard: Must have a saved run
@@ -51,7 +48,7 @@ public static class AbandonRunHandler
         if (!saveManager.HasRunSave)
         {
             Logger.Warning("Cannot abandon run: no saved run exists");
-            return new { ok = false, error = "NO_SAVED_RUN", message = "No saved run exists." };
+            return Responses.Error("NO_SAVED_RUN", "No saved run exists.");
         }
 
         try
@@ -61,7 +58,7 @@ public static class AbandonRunHandler
             if (mainMenu == null)
             {
                 Logger.Error("NMainMenu instance not found");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Main menu not found" };
+                return Responses.Error("UI_NOT_FOUND", "Main menu not found");
             }
 
             // Call AbandonRun() directly (public method on NMainMenu)
@@ -70,12 +67,12 @@ public static class AbandonRunHandler
             mainMenu.AbandonRun();
 
             Logger.Info("Run abandoned successfully");
-            return new { ok = true, data = new { action = "ABANDON_RUN" } };
+            return Responses.Ok(new { action = "ABANDON_RUN" });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to abandon run: {ex.Message}");
-            return new { ok = false, error = "ACTION_FAILED", message = $"Failed to abandon run: {ex.Message}" };
+            return Responses.Error("ACTION_FAILED", $"Failed to abandon run: {ex.Message}");
         }
     }
 }

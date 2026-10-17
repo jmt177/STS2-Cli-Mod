@@ -29,11 +29,7 @@ internal static class ReturnToMenuHandler
         if (currentScreen != "GAME_OVER")
         {
             Logger.Warning($"Cannot return to menu: not on game over screen (current: {currentScreen})");
-            return new
-            {
-                ok = false, error = "NOT_ON_GAME_OVER_SCREEN",
-                message = "Return to menu is only available on the game over screen"
-            };
+            return Responses.Error("NOT_ON_GAME_OVER_SCREEN", "Return to menu is only available on the game over screen");
         }
 
         try
@@ -43,13 +39,13 @@ internal static class ReturnToMenuHandler
             if (overlayStack == null)
             {
                 Logger.Error("NOverlayStack.Instance is null");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Cannot access overlay stack" };
+                return Responses.Error("UI_NOT_FOUND", "Cannot access overlay stack");
             }
 
             if (overlayStack.Peek() is not NGameOverScreen gameOverScreen)
             {
                 Logger.Error("Game over screen not found in overlay stack");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Game over screen not found" };
+                return Responses.Error("UI_NOT_FOUND", "Game over screen not found");
             }
 
             // Find the main menu button
@@ -57,16 +53,13 @@ internal static class ReturnToMenuHandler
             if (mainMenuButton == null)
             {
                 Logger.Error("Main menu button not found (%MainMenuButton)");
-                return new
-                {
-                    ok = false, error = "BUTTON_NOT_FOUND", message = "Main menu button not found on game over screen"
-                };
+                return Responses.Error("BUTTON_NOT_FOUND", "Main menu button not found on game over screen");
             }
 
             if (!mainMenuButton.IsEnabled)
             {
                 Logger.Warning("Main menu button is disabled");
-                return new { ok = false, error = "BUTTON_DISABLED", message = "Main menu button is disabled" };
+                return Responses.Error("BUTTON_DISABLED", "Main menu button is disabled");
             }
 
             // Click the button using EmitSignal (same pattern as other handlers)
@@ -82,21 +75,16 @@ internal static class ReturnToMenuHandler
             if (!menuReady)
             {
                 Logger.Warning("Timed out waiting for main menu after return_to_menu");
-                return new
-                {
-                    ok = true,
-                    data = new { action = "RETURN_TO_MENU" },
-                    warning = "Timed out waiting for main menu to appear"
-                };
+                return Responses.Ok(new { action = "RETURN_TO_MENU" }, "Timed out waiting for main menu to appear");
             }
 
             Logger.Info("Return to menu completed successfully");
-            return new { ok = true, data = new { action = "RETURN_TO_MENU", screen = "MENU" } };
+            return Responses.Ok(new { action = "RETURN_TO_MENU", screen = "MENU" });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to return to menu: {ex.Message}");
-            return new { ok = false, error = "ACTION_FAILED", message = $"Failed to return to menu: {ex.Message}" };
+            return Responses.Error("ACTION_FAILED", $"Failed to return to menu: {ex.Message}");
         }
     }
 }

@@ -32,7 +32,7 @@ public static class ShopBuyPotionHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Potion ID required" };
+            return Responses.Error("MISSING_ARGUMENT", "Potion ID required");
 
         var potionId = request.Id;
         var nth = request.Nth ?? 0;
@@ -43,60 +43,45 @@ public static class ShopBuyPotionHandler
             // --- Guard: Check merchant room ---
             var merchantRoom = NMerchantRoom.Instance;
             if (merchantRoom == null || !merchantRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_SHOP", message = "Not currently in a shop" };
+                return Responses.Error("NOT_IN_SHOP", "Not currently in a shop");
 
             var inventory = merchantRoom.Room.GetLocalInventory();
 
             // --- Find the potion entry by ID + nth ---
             var entry = FindPotionEntry(inventory, potionId, nth);
             if (entry == null)
-                return new
-                {
-                    ok = false, error = "ITEM_NOT_FOUND", message = $"Potion '{potionId}' (nth={nth}) not found in shop"
-                };
+                return Responses.Error("ITEM_NOT_FOUND", $"Potion '{potionId}' (nth={nth}) not found in shop");
 
             // --- Guard: Check item is in stock ---
             if (!entry.IsStocked)
-                return new { ok = false, error = "ITEM_SOLD_OUT", message = $"Potion '{potionId}' is sold out" };
+                return Responses.Error("ITEM_SOLD_OUT", $"Potion '{potionId}' is sold out");
 
             // --- Guard: Check enough gold ---
             if (!entry.EnoughGold)
-                return new
-                {
-                    ok = false, error = "NOT_ENOUGH_GOLD",
-                    message = $"Not enough gold to buy potion '{potionId}' (cost={entry.Cost})"
-                };
+                return Responses.Error("NOT_ENOUGH_GOLD", $"Not enough gold to buy potion '{potionId}' (cost={entry.Cost})");
 
             // --- Purchase ---
             // OnTryPurchaseWrapper handles the full flow: PotionCmd.TryToProcure, gold deduction, etc.
             // It returns false if the potion belt is full (FailureSpace) or purchase is forbidden.
             var success = await entry.OnTryPurchaseWrapper(inventory);
             if (!success)
-                return new
-                {
-                    ok = false, error = "POTION_BELT_FULL",
-                    message = $"Failed to purchase potion '{potionId}' (potion belt may be full)"
-                };
+                return Responses.Error("POTION_BELT_FULL", $"Failed to purchase potion '{potionId}' (potion belt may be full)");
 
             Logger.Info($"Successfully purchased potion: {potionId}");
 
             var screen = StateHandler.DetectScreen();
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "SHOP_BUY_POTION",
-                    potion_id = potionId,
-                    cost = entry.Cost,
-                    screen
-                }
-            };
+                action = "SHOP_BUY_POTION",
+                potion_id = potionId,
+                cost = entry.Cost,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to buy potion: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

@@ -30,7 +30,7 @@ public static class PickRelicHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (request.Args == null || request.Args.Length < 1)
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Relic index required (0-based)" };
+            return Responses.Error("MISSING_ARGUMENT", "Relic index required (0-based)");
 
         var relicIndex = request.Args[0];
         Logger.Info($"Requested to pick relic at index {relicIndex}");
@@ -40,26 +40,17 @@ public static class PickRelicHandler
             // --- Guard: Check treasure room ---
             var treasureRoom = NRun.Instance?.TreasureRoom;
             if (treasureRoom == null || !treasureRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_TREASURE_ROOM", message = "Not currently in a treasure room" };
+                return Responses.Error("NOT_IN_TREASURE_ROOM", "Not currently in a treasure room");
 
             // --- Guard: Check relics available ---
             var synchronizer = RunManager.Instance.TreasureRoomRelicSynchronizer;
             var currentRelics = synchronizer.CurrentRelics;
             if (currentRelics == null || currentRelics.Count == 0)
-                return new
-                {
-                    ok = false, error = "NO_RELICS_AVAILABLE",
-                    message = "No relics available to pick (chest not opened or already picked)"
-                };
+                return Responses.Error("NO_RELICS_AVAILABLE", "No relics available to pick (chest not opened or already picked)");
 
             // --- Guard: Check relic index ---
             if (relicIndex < 0 || relicIndex >= currentRelics.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_RELIC_INDEX",
-                    message = $"Relic index {relicIndex} is out of range (0-{currentRelics.Count - 1})"
-                };
+                return Responses.Error("INVALID_RELIC_INDEX", $"Relic index {relicIndex} is out of range (0-{currentRelics.Count - 1})");
 
             // --- Pick the relic ---
             var relicModel = currentRelics[relicIndex];
@@ -77,22 +68,18 @@ public static class PickRelicHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"After picking relic, detected screen: {screen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "PICK_RELIC",
-                    relic_id = relicId,
-                    relic_index = relicIndex,
-                    screen
-                }
-            };
+                action = "PICK_RELIC",
+                relic_id = relicId,
+                relic_index = relicIndex,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to pick relic: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 }

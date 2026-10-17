@@ -31,7 +31,7 @@ public static class ChooseEventHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (request.Args == null || request.Args.Length == 0)
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Option index required" };
+            return Responses.Error("MISSING_ARGUMENT", "Option index required");
 
         var optionIndex = request.Args[0];
         Logger.Info($"Requested to choose event option at index {optionIndex}");
@@ -41,28 +41,23 @@ public static class ChooseEventHandler
             // --- Guard: Check event room ---
             var eventRoom = NEventRoom.Instance;
             if (eventRoom == null || !eventRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_EVENT", message = "Not currently in an event" };
+                return Responses.Error("NOT_IN_EVENT", "Not currently in an event");
 
             // --- Guard: Check layout exists ---
             var layout = eventRoom.Layout;
             if (layout == null)
-                return new { ok = false, error = "NO_EVENT_LAYOUT", message = "Event layout not found" };
+                return Responses.Error("NO_EVENT_LAYOUT", "Event layout not found");
 
             // --- Guard: Get the event model and validate the option index ---
             var eventModel = EventUtils.GetEventModel(eventRoom);
             if (eventModel == null)
-                return new { ok = false, error = "INTERNAL_ERROR", message = "Failed to access event model" };
+                return Responses.Error("INTERNAL_ERROR", "Failed to access event model");
 
             // --- Handle finished event (proceed to map) ---
             if (eventModel.IsFinished)
             {
                 if (optionIndex != 0)
-                    return new
-                    {
-                        ok = false,
-                        error = "INVALID_OPTION_INDEX",
-                        message = "Event is finished, only option index 0 (proceed) is available"
-                    };
+                    return Responses.Error("INVALID_OPTION_INDEX", "Event is finished, only option index 0 (proceed) is available");
 
                 Logger.Info("Event is finished, calling NEventRoom.Proceed()");
                 await NEventRoom.Proceed();
@@ -72,47 +67,28 @@ public static class ChooseEventHandler
                 if (!proceeded)
                     Logger.Warning("Timed out waiting for proceed transition");
 
-                return new
+                return Responses.Ok(new
                 {
-                    ok = true,
-                    data = new
-                    {
-                        option_index = 0,
-                        is_proceed = true,
-                        proceeded
-                    }
-                };
+                    option_index = 0,
+                    is_proceed = true,
+                    proceeded
+                });
             }
 
             var currentOptions = eventModel.CurrentOptions;
             if (optionIndex < 0 || optionIndex >= currentOptions.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_OPTION_INDEX",
-                    message = $"Option index {optionIndex} out of range (event has {currentOptions.Count} options)"
-                };
+                return Responses.Error("INVALID_OPTION_INDEX", $"Option index {optionIndex} out of range (event has {currentOptions.Count} options)");
 
             var selectedOption = currentOptions[optionIndex];
 
             // --- Guard: Check option is not locked ---
             if (selectedOption.IsLocked)
-                return new
-                {
-                    ok = false,
-                    error = "OPTION_LOCKED",
-                    message = $"Option at index {optionIndex} is locked and cannot be selected"
-                };
+                return Responses.Error("OPTION_LOCKED", $"Option at index {optionIndex} is locked and cannot be selected");
 
             // --- Find the option button ---
             var optionButtons = layout.OptionButtons.ToList();
             if (optionIndex >= optionButtons.Count)
-                return new
-                {
-                    ok = false,
-                    error = "OPTION_BUTTON_NOT_FOUND",
-                    message = $"Option button at index {optionIndex} not found in UI"
-                };
+                return Responses.Error("OPTION_BUTTON_NOT_FOUND", $"Option button at index {optionIndex} not found in UI");
 
             var targetButton = optionButtons[optionIndex];
 
@@ -146,16 +122,12 @@ public static class ChooseEventHandler
                 if (!proceeded)
                     Logger.Warning("Timed out waiting for proceed transition");
 
-                return new
+                return Responses.Ok(new
                 {
-                    ok = true,
-                    data = new
-                    {
-                        option_index = optionIndex,
-                        is_proceed = true,
-                        proceeded
-                    }
-                };
+                    option_index = optionIndex,
+                    is_proceed = true,
+                    proceeded
+                });
             }
 
             // Wait for the event state to change (new page)
@@ -164,32 +136,23 @@ public static class ChooseEventHandler
             if (!stateChanged)
             {
                 Logger.Warning("Timed out waiting for event state change");
-                return new
-                {
-                    ok = false,
-                    error = "EVENT_TIMEOUT",
-                    message = "Event state did not change within timeout period"
-                };
+                return Responses.Error("EVENT_TIMEOUT", "Event state did not change within timeout period");
             }
 
             // Build and return the updated event state
             var updatedEventState = EventStateBuilder.Build();
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    option_index = optionIndex,
-                    is_proceed = false,
-                    event_state = updatedEventState
-                }
-            };
+                option_index = optionIndex,
+                is_proceed = false,
+                event_state = updatedEventState
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to choose event option: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

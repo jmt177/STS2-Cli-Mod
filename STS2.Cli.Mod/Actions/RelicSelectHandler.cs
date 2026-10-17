@@ -39,7 +39,7 @@ public static class RelicSelectHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (request.Args == null || request.Args.Length < 1)
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Relic index required (0-based)" };
+            return Responses.Error("MISSING_ARGUMENT", "Relic index required (0-based)");
 
         var relicIndex = request.Args[0];
         Logger.Info($"Requested to select relic at index {relicIndex}");
@@ -49,31 +49,16 @@ public static class RelicSelectHandler
             // --- Guard: Check relic selection screen ---
             var screen = UiUtils.FindScreenInOverlay<NChooseARelicSelection>();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_RELIC_SELECT",
-                    message = "Not in relic selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_RELIC_SELECT", "Not in relic selection screen. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Find relic holders ---
             var holders = UiUtils.FindAll<NRelicBasicHolder>(screen);
             if (holders.Count == 0)
-                return new
-                {
-                    ok = false,
-                    error = "NO_RELICS_AVAILABLE",
-                    message = "No relics available in the selection screen"
-                };
+                return Responses.Error("NO_RELICS_AVAILABLE", "No relics available in the selection screen");
 
             // --- Guard: Check relic index ---
             if (relicIndex < 0 || relicIndex >= holders.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_RELIC_INDEX",
-                    message = $"Relic index {relicIndex} is out of range (0-{holders.Count - 1})"
-                };
+                return Responses.Error("INVALID_RELIC_INDEX", $"Relic index {relicIndex} is out of range (0-{holders.Count - 1})");
 
             // --- Select the relic ---
             var holder = holders[relicIndex];
@@ -94,22 +79,18 @@ public static class RelicSelectHandler
             var resultScreen = StateHandler.DetectScreen();
             Logger.Info($"After selecting relic, detected screen: {resultScreen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "RELIC_SELECT",
-                    relic_id = relicId,
-                    relic_index = relicIndex,
-                    screen = resultScreen
-                }
-            };
+                action = "RELIC_SELECT",
+                relic_id = relicId,
+                relic_index = relicIndex,
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to select relic: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -125,23 +106,13 @@ public static class RelicSelectHandler
             // --- Guard: Check relic selection screen ---
             var screen = UiUtils.FindScreenInOverlay<NChooseARelicSelection>();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_RELIC_SELECT",
-                    message = "Not in relic selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_RELIC_SELECT", "Not in relic selection screen. Use 'sts2 state' to check current screen.");
 
             // --- Find and click the skip button ---
             // NChooseARelicSelection has a NChoiceSelectionSkipButton at node path "SkipButton"
             var skipButton = UiUtils.FindFirst<NChoiceSelectionSkipButton>(screen);
             if (skipButton == null)
-                return new
-                {
-                    ok = false,
-                    error = "SKIP_BUTTON_NOT_FOUND",
-                    message = "Skip button not found in relic selection screen"
-                };
+                return Responses.Error("SKIP_BUTTON_NOT_FOUND", "Skip button not found in relic selection screen");
 
             Logger.Info("Skipping relic selection");
             skipButton.ForceClick();
@@ -157,20 +128,16 @@ public static class RelicSelectHandler
             var resultScreen = StateHandler.DetectScreen();
             Logger.Info($"After skipping relic selection, detected screen: {resultScreen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "RELIC_SKIP",
-                    screen = resultScreen
-                }
-            };
+                action = "RELIC_SKIP",
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to skip relic selection: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 }

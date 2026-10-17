@@ -29,14 +29,14 @@ public static class ViewDeckHandler
         try
         {
             if (!RunManager.Instance.IsInProgress)
-                return new { ok = false, error = "NO_ACTIVE_RUN", message = "No run is currently in progress" };
+                return Responses.Error("NO_ACTIVE_RUN", "No run is currently in progress");
 
             var runState = RunManager.Instance.DebugOnlyGetState();
             if (runState == null)
-                return new { ok = false, error = "INTERNAL_ERROR", message = "RunState is null" };
+                return Responses.Error("INTERNAL_ERROR", "RunState is null");
 
             if (runState.Players.Count == 0)
-                return new { ok = false, error = "INTERNAL_ERROR", message = "No players found" };
+                return Responses.Error("INTERNAL_ERROR", "No players found");
 
             var player = runState.Players[0];
             var cards = player.Deck.Cards;
@@ -54,20 +54,16 @@ public static class ViewDeckHandler
 
             Logger.Info($"Deck viewed: {deckCards.Count} cards");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    count = deckCards.Count,
-                    cards = deckCards
-                }
-            };
+                count = deckCards.Count,
+                cards = deckCards
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to view deck: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = $"Deck view failed: {ex.Message}" };
+            return Responses.Error("INTERNAL_ERROR", $"Deck view failed: {ex.Message}");
         }
     }
 

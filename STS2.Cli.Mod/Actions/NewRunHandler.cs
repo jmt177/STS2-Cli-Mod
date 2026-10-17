@@ -39,10 +39,7 @@ public static class NewRunHandler
         if (currentScreen != "MENU")
         {
             Logger.Warning($"Cannot start new run: not on menu screen (current: {currentScreen})");
-            return new
-            {
-                ok = false, error = "NOT_ON_MENU", message = $"Not on main menu screen (current: {currentScreen})"
-            };
+            return Responses.Error("NOT_ON_MENU", $"Not on main menu screen (current: {currentScreen})");
         }
 
         // Guard: Must NOT have a saved run (abandon first)
@@ -50,11 +47,7 @@ public static class NewRunHandler
         if (saveManager.HasRunSave)
         {
             Logger.Warning("Cannot start new run: a saved run exists. Use abandon_run first.");
-            return new
-            {
-                ok = false, error = "RUN_SAVE_EXISTS",
-                message = "A saved run exists. Use abandon_run to abandon it first, then use new_run."
-            };
+            return Responses.Error("RUN_SAVE_EXISTS", "A saved run exists. Use abandon_run to abandon it first, then use new_run.");
         }
 
         try
@@ -64,7 +57,7 @@ public static class NewRunHandler
             if (mainMenu == null)
             {
                 Logger.Error("NMainMenu instance not found");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Main menu not found" };
+                return Responses.Error("UI_NOT_FOUND", "Main menu not found");
             }
 
             // Find the Singleplayer button
@@ -73,13 +66,13 @@ public static class NewRunHandler
             if (singleplayerButton == null)
             {
                 Logger.Error("Singleplayer button not found");
-                return new { ok = false, error = "BUTTON_NOT_FOUND", message = "Singleplayer button not found" };
+                return Responses.Error("BUTTON_NOT_FOUND", "Singleplayer button not found");
             }
 
             if (!singleplayerButton.IsVisible())
             {
                 Logger.Warning("Singleplayer button is not visible (saved run may exist)");
-                return new { ok = false, error = "BUTTON_NOT_FOUND", message = "Singleplayer button is not visible" };
+                return Responses.Error("BUTTON_NOT_FOUND", "Singleplayer button is not visible");
             }
 
             // Click the Singleplayer button via EmitSignal
@@ -97,12 +90,7 @@ public static class NewRunHandler
             if (!screenReady)
             {
                 Logger.Warning("Timed out waiting for submenu or character select after new_run");
-                return new
-                {
-                    ok = true,
-                    data = new { action = "NEW_RUN" },
-                    warning = "Timed out waiting for destination screen"
-                };
+                return Responses.Ok(new { action = "NEW_RUN" }, "Timed out waiting for destination screen");
             }
 
             // Detect which screen we landed on
@@ -110,12 +98,12 @@ public static class NewRunHandler
                 ? "CHARACTER_SELECT"
                 : "SINGLEPLAYER_SUBMENU";
             Logger.Info($"New run initiated, landed on {screen} screen");
-            return new { ok = true, data = new { action = "NEW_RUN", screen } };
+            return Responses.Ok(new { action = "NEW_RUN", screen });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to start new run: {ex.Message}");
-            return new { ok = false, error = "ACTION_FAILED", message = $"Failed to start new run: {ex.Message}" };
+            return Responses.Error("ACTION_FAILED", $"Failed to start new run: {ex.Message}");
         }
     }
 }

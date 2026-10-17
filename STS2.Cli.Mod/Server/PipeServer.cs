@@ -111,7 +111,7 @@ public static class PipeServer
             if (request == null)
             {
                 await writer.WriteLineAsync(JsonSerializer.Serialize(
-                    new { ok = false, error = "INVALID_REQUEST", message = "Failed to parse request" },
+                    Responses.Error("INVALID_REQUEST", "Failed to parse request"),
                     JsonOptions.Default));
                 return;
             }
@@ -132,6 +132,23 @@ public static class PipeServer
     }
 
     /// <summary>
+    ///     Command pattern: one delegate per command name, each adapted to the uniform
+    ///     <c>Func&lt;Request, Task&lt;object&gt;&gt;</c> shape regardless of the underlying handler's
+    ///     actual signature (some take a <see cref="Request" />, some take none; some expose extra
+    ///     methods like <c>ExecuteSkipAsync</c> alongside <c>ExecuteAsync</c>). Replaces a 44-case
+    ///     switch statement with a lookup table, and doubles as a registry of every known command —
+    ///     see <see cref="AvailableCommands" />.
+    /// </summary>
+    private static readonly Dictionary<string, Func<Request, Task<object>>> Handlers = BuildHandlerRegistry();
+
+    /// <summary>
+    ///     Every command name the mod can dispatch (excludes <c>ping</c>, which is handled as a
+    ///     fast path with no game-state access). Useful for discovery — e.g. validating that a
+    ///     client-side command list stays in sync with the mod.
+    /// </summary>
+    public static IReadOnlyCollection<string> AvailableCommands => Handlers.Keys;
+
+    /// <summary>
     ///     Processes a parsed request and routes it to the appropriate handler.
     ///     All game-thread commands use <see cref="MainThreadExecutor.RunOnMainThreadAsync{T}" />
     ///     to marshal execution to the Godot main thread.
@@ -144,155 +161,98 @@ public static class PipeServer
         {
             var cmd = request.Cmd.ToLowerInvariant();
 
-            return cmd switch
-            {
-                // --- Connection test (no game state access) ---
-                "ping" => new { ok = true, data = new { connected = true } },
+            // Connection test: no game state access, so it skips main-thread marshaling entirely.
+            if (cmd == "ping")
+                return Responses.Ok(new { connected = true });
 
-                // --- State query ---
-                "state" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    StateHandler.HandleRequestAsync(request)),
+            if (!Handlers.TryGetValue(cmd, out var handler))
+                return Responses.Error("UNKNOWN_COMMAND", $"Unknown command: {request.Cmd}");
 
-                "view_deck" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ViewDeckHandler.ExecuteAsync()),
-
-                // --- Main menu ---
-                "continue_run" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ContinueRunHandler.ExecuteAsync()),
-
-                "new_run" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    NewRunHandler.ExecuteAsync()),
-
-                "abandon_run" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    AbandonRunHandler.ExecuteAsync()),
-
-                "choose_game_mode" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ChooseGameModeHandler.ExecuteAsync(request)),
-
-                // --- Character select ---
-                "select_character" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    SelectCharacterHandler.ExecuteAsync(request)),
-
-                "set_ascension" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    SetAscensionHandler.ExecuteAsync(request)),
-
-                "embark" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    EmbarkHandler.ExecuteAsync()),
-
-                // --- Map navigation ---
-                "choose_map_node" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ChooseMapNodeHandler.ExecuteAsync(request)),
-
-                // --- Combat ---
-                "play_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    PlayCardHandler.ExecuteAsync(request)),
-
-                "end_turn" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    EndTurnHandler.ExecuteAsync(request)),
-
-                "use_potion" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    UsePotionHandler.ExecuteAsync(request)),
-
-                // --- Combat sub-states (hand/grid selection) ---
-                "hand_select_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    HandSelectCardHandler.ExecuteAsync(request)),
-
-                "hand_confirm_selection" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    HandSelectCardHandler.ExecuteConfirmAsync()),
-
-                "grid_select_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    GridSelectCardHandler.ExecuteAsync(request)),
-
-                "grid_select_skip" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    GridSelectCardHandler.ExecuteSkipAsync()),
-
-                // --- Event rooms ---
-                "choose_event" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ChooseEventHandler.ExecuteAsync(request)),
-
-                "advance_dialogue" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    AdvanceDialogueHandler.ExecuteAsync(request)),
-
-                // --- Rest site ---
-                "choose_rest_option" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ChooseRestOptionHandler.ExecuteAsync(request)),
-
-                // --- Treasure room ---
-                "open_chest" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    OpenChestHandler.ExecuteAsync()),
-
-                "pick_relic" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    PickRelicHandler.ExecuteAsync(request)),
-
-                // --- Shop ---
-                "shop_buy_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ShopBuyCardHandler.ExecuteAsync(request)),
-
-                "shop_buy_relic" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ShopBuyRelicHandler.ExecuteAsync(request)),
-
-                "shop_buy_potion" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ShopBuyPotionHandler.ExecuteAsync(request)),
-
-                "shop_remove_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ShopRemoveCardHandler.ExecuteAsync()),
-
-                // --- Post-combat rewards ---
-                "reward_claim" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    RewardClaimHandler.ExecuteAsync(request)),
-
-                "reward_choose_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    RewardCardHandler.ExecuteAsync(request)),
-
-                "reward_skip_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    RewardCardHandler.ExecuteSkipAsync(request)),
-
-                // --- Overlay screens (shared across contexts) ---
-                "tri_select_card" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    TriSelectCardHandler.ExecuteAsync(request)),
-
-                "tri_select_skip" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    TriSelectCardHandler.ExecuteSkipAsync(request)),
-
-                "relic_select" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    RelicSelectHandler.ExecuteAsync(request)),
-
-                "relic_skip" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    RelicSelectHandler.ExecuteSkipAsync()),
-
-                "bundle_select" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    BundleSelectHandler.HandleSelectAsync(request)),
-
-                "bundle_confirm" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    BundleSelectHandler.HandleConfirmAsync()),
-
-                "bundle_cancel" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    BundleSelectHandler.HandleCancelAsync()),
-
-                "crystal_set_tool" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    CrystalSphereHandler.HandleSetToolAsync(request)),
-
-                "crystal_click_cell" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    CrystalSphereHandler.HandleClickCellAsync(request)),
-
-                "crystal_proceed" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    CrystalSphereHandler.HandleProceedAsync()),
-
-                // --- Navigation (shared across contexts) ---
-                "proceed" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ProceedHandler.ExecuteAsync()),
-
-                // --- Game over ---
-                "return_to_menu" => await MainThreadExecutor.RunOnMainThreadAsync(() =>
-                    ReturnToMenuHandler.ExecuteAsync()),
-
-                _ => new { ok = false, error = "UNKNOWN_COMMAND", message = $"Unknown command: {request.Cmd}" }
-            };
+            return await MainThreadExecutor.RunOnMainThreadAsync(() => handler(request));
         }
         catch (Exception ex)
         {
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
+    }
+
+    /// <summary>
+    ///     Builds the command registry. Each entry adapts a handler class's actual method(s) to
+    ///     the uniform <c>Func&lt;Request, Task&lt;object&gt;&gt;</c> shape the dispatcher expects.
+    /// </summary>
+    private static Dictionary<string, Func<Request, Task<object>>> BuildHandlerRegistry()
+    {
+        return new Dictionary<string, Func<Request, Task<object>>>
+        {
+            // --- State query ---
+            ["state"] = StateHandler.HandleRequestAsync,
+            ["view_deck"] = _ => ViewDeckHandler.ExecuteAsync(),
+
+            // --- Main menu ---
+            ["continue_run"] = _ => ContinueRunHandler.ExecuteAsync(),
+            ["new_run"] = _ => NewRunHandler.ExecuteAsync(),
+            ["abandon_run"] = _ => AbandonRunHandler.ExecuteAsync(),
+            ["choose_game_mode"] = ChooseGameModeHandler.ExecuteAsync,
+
+            // --- Character select ---
+            ["select_character"] = SelectCharacterHandler.ExecuteAsync,
+            ["set_ascension"] = SetAscensionHandler.ExecuteAsync,
+            ["embark"] = _ => EmbarkHandler.ExecuteAsync(),
+
+            // --- Map navigation ---
+            ["choose_map_node"] = ChooseMapNodeHandler.ExecuteAsync,
+
+            // --- Combat ---
+            ["play_card"] = PlayCardHandler.ExecuteAsync,
+            ["end_turn"] = EndTurnHandler.ExecuteAsync,
+            ["use_potion"] = UsePotionHandler.ExecuteAsync,
+
+            // --- Combat sub-states (hand/grid selection) ---
+            ["hand_select_card"] = HandSelectCardHandler.ExecuteAsync,
+            ["hand_confirm_selection"] = _ => HandSelectCardHandler.ExecuteConfirmAsync(),
+            ["grid_select_card"] = GridSelectCardHandler.ExecuteAsync,
+            ["grid_select_skip"] = _ => GridSelectCardHandler.ExecuteSkipAsync(),
+
+            // --- Event rooms ---
+            ["choose_event"] = ChooseEventHandler.ExecuteAsync,
+            ["advance_dialogue"] = AdvanceDialogueHandler.ExecuteAsync,
+
+            // --- Rest site ---
+            ["choose_rest_option"] = ChooseRestOptionHandler.ExecuteAsync,
+
+            // --- Treasure room ---
+            ["open_chest"] = _ => OpenChestHandler.ExecuteAsync(),
+            ["pick_relic"] = PickRelicHandler.ExecuteAsync,
+
+            // --- Shop ---
+            ["shop_buy_card"] = ShopBuyCardHandler.ExecuteAsync,
+            ["shop_buy_relic"] = ShopBuyRelicHandler.ExecuteAsync,
+            ["shop_buy_potion"] = ShopBuyPotionHandler.ExecuteAsync,
+            ["shop_remove_card"] = _ => ShopRemoveCardHandler.ExecuteAsync(),
+
+            // --- Post-combat rewards ---
+            ["reward_claim"] = RewardClaimHandler.ExecuteAsync,
+            ["reward_choose_card"] = RewardCardHandler.ExecuteAsync,
+            ["reward_skip_card"] = RewardCardHandler.ExecuteSkipAsync,
+
+            // --- Overlay screens (shared across contexts) ---
+            ["tri_select_card"] = TriSelectCardHandler.ExecuteAsync,
+            ["tri_select_skip"] = TriSelectCardHandler.ExecuteSkipAsync,
+            ["relic_select"] = RelicSelectHandler.ExecuteAsync,
+            ["relic_skip"] = _ => RelicSelectHandler.ExecuteSkipAsync(),
+            ["bundle_select"] = BundleSelectHandler.HandleSelectAsync,
+            ["bundle_confirm"] = _ => BundleSelectHandler.HandleConfirmAsync(),
+            ["bundle_cancel"] = _ => BundleSelectHandler.HandleCancelAsync(),
+            ["crystal_set_tool"] = CrystalSphereHandler.HandleSetToolAsync,
+            ["crystal_click_cell"] = CrystalSphereHandler.HandleClickCellAsync,
+            ["crystal_proceed"] = _ => CrystalSphereHandler.HandleProceedAsync(),
+
+            // --- Navigation (shared across contexts) ---
+            ["proceed"] = _ => ProceedHandler.ExecuteAsync(),
+
+            // --- Game over ---
+            ["return_to_menu"] = _ => ReturnToMenuHandler.ExecuteAsync()
+        };
     }
 
     /// <summary>

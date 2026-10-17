@@ -46,30 +46,20 @@ public static class AdvanceDialogueHandler
             // --- Guard: Check event room ---
             var eventRoom = NEventRoom.Instance;
             if (eventRoom == null || !eventRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_EVENT", message = "Not currently in an event" };
+                return Responses.Error("NOT_IN_EVENT", "Not currently in an event");
 
             // --- Guard: Check layout is Ancient ---
             if (eventRoom.Layout is not NAncientEventLayout ancientLayout)
-                return new
-                {
-                    ok = false, error = "NOT_ANCIENT_EVENT", message = "Current event is not an Ancient event"
-                };
+                return Responses.Error("NOT_ANCIENT_EVENT", "Current event is not an Ancient event");
 
             // --- Guard: Check we're in dialogue phase ---
             if (IsDialogueFinished(ancientLayout))
-                return new
-                {
-                    ok = false, error = "NOT_IN_DIALOGUE",
-                    message = "Dialogue has already finished, options are available"
-                };
+                return Responses.Error("NOT_IN_DIALOGUE", "Dialogue has already finished, options are available");
 
             // --- Find the dialogue hitbox ---
             var hitbox = FindDialogueHitbox(ancientLayout);
             if (hitbox == null)
-                return new
-                {
-                    ok = false, error = "DIALOGUE_HITBOX_NOT_FOUND", message = "Could not find dialogue hitbox"
-                };
+                return Responses.Error("DIALOGUE_HITBOX_NOT_FOUND", "Could not find dialogue hitbox");
 
             if (auto)
                 // Auto-advance all dialogue lines
@@ -81,7 +71,7 @@ public static class AdvanceDialogueHandler
         catch (Exception ex)
         {
             Logger.Error($"Failed to advance dialogue: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -105,12 +95,7 @@ public static class AdvanceDialogueHandler
         if (!advanced)
         {
             Logger.Warning("Timed out waiting for dialogue to advance");
-            return new
-            {
-                ok = false,
-                error = "EVENT_TIMEOUT",
-                message = "Dialogue did not advance within timeout period"
-            };
+            return Responses.Error("EVENT_TIMEOUT", "Dialogue did not advance within timeout period");
         }
 
         var currentLine = GetCurrentDialogueLine(ancientLayout);
@@ -119,18 +104,14 @@ public static class AdvanceDialogueHandler
 
         Logger.Info($"Advanced to line {currentLine}, finished={isFinished}");
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                advanced = true,
-                is_dialogue_finished = isFinished,
-                current_line = currentLine,
-                total_lines = totalLines,
-                previous_line = initialLine
-            }
-        };
+            advanced = true,
+            is_dialogue_finished = isFinished,
+            current_line = currentLine,
+            total_lines = totalLines,
+            previous_line = initialLine
+        });
     }
 
     /// <summary>
@@ -188,19 +169,15 @@ public static class AdvanceDialogueHandler
         object? eventState = null;
         if (isFinished) eventState = EventStateBuilder.Build();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                advanced = true,
-                is_dialogue_finished = isFinished,
-                lines_advanced = linesAdvanced,
-                current_line = finalLine,
-                total_lines = totalLines,
-                event_state = eventState
-            }
-        };
+            advanced = true,
+            is_dialogue_finished = isFinished,
+            lines_advanced = linesAdvanced,
+            current_line = finalLine,
+            total_lines = totalLines,
+            event_state = eventState
+        });
     }
 
     /// <summary>

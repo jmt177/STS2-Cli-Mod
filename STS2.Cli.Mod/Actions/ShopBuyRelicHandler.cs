@@ -30,7 +30,7 @@ public static class ShopBuyRelicHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Relic ID required" };
+            return Responses.Error("MISSING_ARGUMENT", "Relic ID required");
 
         var relicId = request.Id;
         var nth = request.Nth ?? 0;
@@ -41,54 +41,43 @@ public static class ShopBuyRelicHandler
             // --- Guard: Check merchant room ---
             var merchantRoom = NMerchantRoom.Instance;
             if (merchantRoom == null || !merchantRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_SHOP", message = "Not currently in a shop" };
+                return Responses.Error("NOT_IN_SHOP", "Not currently in a shop");
 
             var inventory = merchantRoom.Room.GetLocalInventory();
 
             // --- Find the relic entry by ID + nth ---
             var entry = FindRelicEntry(inventory, relicId, nth);
             if (entry == null)
-                return new
-                {
-                    ok = false, error = "ITEM_NOT_FOUND", message = $"Relic '{relicId}' (nth={nth}) not found in shop"
-                };
+                return Responses.Error("ITEM_NOT_FOUND", $"Relic '{relicId}' (nth={nth}) not found in shop");
 
             // --- Guard: Check item is in stock ---
             if (!entry.IsStocked)
-                return new { ok = false, error = "ITEM_SOLD_OUT", message = $"Relic '{relicId}' is sold out" };
+                return Responses.Error("ITEM_SOLD_OUT", $"Relic '{relicId}' is sold out");
 
             // --- Guard: Check enough gold ---
             if (!entry.EnoughGold)
-                return new
-                {
-                    ok = false, error = "NOT_ENOUGH_GOLD",
-                    message = $"Not enough gold to buy relic '{relicId}' (cost={entry.Cost})"
-                };
+                return Responses.Error("NOT_ENOUGH_GOLD", $"Not enough gold to buy relic '{relicId}' (cost={entry.Cost})");
 
             // --- Purchase ---
             var success = await entry.OnTryPurchaseWrapper(inventory);
             if (!success)
-                return new { ok = false, error = "PURCHASE_FAILED", message = $"Failed to purchase relic '{relicId}'" };
+                return Responses.Error("PURCHASE_FAILED", $"Failed to purchase relic '{relicId}'");
 
             Logger.Info($"Successfully purchased relic: {relicId}");
 
             var screen = StateHandler.DetectScreen();
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "SHOP_BUY_RELIC",
-                    relic_id = relicId,
-                    cost = entry.Cost,
-                    screen
-                }
-            };
+                action = "SHOP_BUY_RELIC",
+                relic_id = relicId,
+                cost = entry.Cost,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to buy relic: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

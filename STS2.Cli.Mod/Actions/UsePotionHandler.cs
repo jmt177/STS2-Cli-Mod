@@ -71,7 +71,7 @@ public static class UsePotionHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Potion ID required (e.g., FIRE_POTION)" };
+            return Responses.Error("MISSING_ARGUMENT", "Potion ID required (e.g., FIRE_POTION)");
 
         var potionId = request.Id;
         var nth = request.Nth ?? 0;
@@ -93,7 +93,7 @@ public static class UsePotionHandler
                 : ActionUtils.GetLocalPlayerFromRun();
 
             if (player == null)
-                return new { ok = false, error = "NO_PLAYER", message = "Player not found" };
+                return Responses.Error("NO_PLAYER", "Player not found");
 
             // --- Find potion first (needed to check Usage type) ---
 
@@ -107,18 +107,10 @@ public static class UsePotionHandler
             if (usageError != null) return usageError;
 
             if (potion.IsQueued)
-                return new
-                {
-                    ok = false, error = "POTION_ALREADY_QUEUED",
-                    message = $"Potion '{potion.Title}' is already queued for use"
-                };
+                return Responses.Error("POTION_ALREADY_QUEUED", $"Potion '{potion.Title}' is already queued for use");
 
             if (!potion.PassesCustomUsabilityCheck)
-                return new
-                {
-                    ok = false, error = "POTION_NOT_USABLE",
-                    message = $"Potion '{potion.Title}' cannot be used right now"
-                };
+                return Responses.Error("POTION_NOT_USABLE", $"Potion '{potion.Title}' cannot be used right now");
 
             // --- Resolve target ---
 
@@ -133,11 +125,7 @@ public static class UsePotionHandler
             }
             else if (targetCombatId != null)
             {
-                return new
-                {
-                    ok = false, error = "TARGET_NOT_ALLOWED",
-                    message = "Cannot target creatures outside combat"
-                };
+                return Responses.Error("TARGET_NOT_ALLOWED", "Cannot target creatures outside combat");
             }
 
             // --- Enqueue and execute ---
@@ -153,7 +141,7 @@ public static class UsePotionHandler
         catch (Exception ex)
         {
             Logger.Error($"Failed to use potion: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -224,27 +212,27 @@ public static class UsePotionHandler
         switch (uiType)
         {
             case "tri_select":
-            {
-                var screen = UiUtils.FindScreenInOverlay<NChooseACardSelectionScreen>();
-                if (screen != null)
-                    return BuildTriSelectResponse(potion, slot, screen);
-                break;
-            }
+                {
+                    var screen = UiUtils.FindScreenInOverlay<NChooseACardSelectionScreen>();
+                    if (screen != null)
+                        return BuildTriSelectResponse(potion, slot, screen);
+                    break;
+                }
 
             case "hand_select":
-            {
-                if (NPlayerHand.Instance is { IsInCardSelection: true })
-                    return BuildHandSelectResponse(potion, slot);
-                break;
-            }
+                {
+                    if (NPlayerHand.Instance is { IsInCardSelection: true })
+                        return BuildHandSelectResponse(potion, slot);
+                    break;
+                }
 
             case "grid_select":
-            {
-                var gridScreen = UiUtils.FindScreenInOverlay<NCardGridSelectionScreen>();
-                if (gridScreen != null)
-                    return BuildGridSelectResponse(potion, slot, gridScreen);
-                break;
-            }
+                {
+                    var gridScreen = UiUtils.FindScreenInOverlay<NCardGridSelectionScreen>();
+                    if (gridScreen != null)
+                        return BuildGridSelectResponse(potion, slot, gridScreen);
+                    break;
+                }
         }
 
         return null;
@@ -267,44 +255,30 @@ public static class UsePotionHandler
         switch (potion.Usage)
         {
             case PotionUsage.CombatOnly:
-            {
-                var combatError = ActionUtils.ValidateCombatReady();
-                if (combatError != null) return combatError;
-                if (!player.Creature.IsAlive)
-                    return new { ok = false, error = "PLAYER_DEAD", message = "Player is dead - cannot use potions" };
-                break;
-            }
-            case PotionUsage.AnyTime:
-            {
-                if (!RunManager.Instance.IsInProgress)
-                    return new { ok = false, error = "NOT_IN_RUN", message = "No active run" };
-                if (isInCombat)
                 {
-                    if (CombatManager.Instance.IsOverOrEnding)
-                        return new
-                        {
-                            ok = false, error = "COMBAT_ENDING", message = "Combat is over or ending"
-                        };
+                    var combatError = ActionUtils.ValidateCombatReady();
+                    if (combatError != null) return combatError;
                     if (!player.Creature.IsAlive)
-                        return new
-                        {
-                            ok = false, error = "PLAYER_DEAD", message = "Player is dead - cannot use potions"
-                        };
+                        return Responses.Error("PLAYER_DEAD", "Player is dead - cannot use potions");
+                    break;
                 }
-                break;
-            }
+            case PotionUsage.AnyTime:
+                {
+                    if (!RunManager.Instance.IsInProgress)
+                        return Responses.Error("NOT_IN_RUN", "No active run");
+                    if (isInCombat)
+                    {
+                        if (CombatManager.Instance.IsOverOrEnding)
+                            return Responses.Error("COMBAT_ENDING", "Combat is over or ending");
+                        if (!player.Creature.IsAlive)
+                            return Responses.Error("PLAYER_DEAD", "Player is dead - cannot use potions");
+                    }
+                    break;
+                }
             case PotionUsage.Automatic:
-                return new
-                {
-                    ok = false, error = "AUTOMATIC_POTION",
-                    message = $"Potion '{potion.Title}' is automatic and cannot be used manually"
-                };
+                return Responses.Error("AUTOMATIC_POTION", $"Potion '{potion.Title}' is automatic and cannot be used manually");
             default:
-                return new
-                {
-                    ok = false, error = "POTION_NOT_USABLE",
-                    message = $"Potion '{potion.Title}' cannot be used (usage type: {potion.Usage})"
-                };
+                return Responses.Error("POTION_NOT_USABLE", $"Potion '{potion.Title}' cannot be used (usage type: {potion.Usage})");
         }
 
         return null;
@@ -378,19 +352,15 @@ public static class UsePotionHandler
         PotionModel potion, int slot, NChooseACardSelectionScreen selectionScreen)
     {
         var triState = TriSelectStateBuilder.Build(selectionScreen);
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "tri_select_card",
-                selection_type = GetSelectionType(potion.Id.Entry),
-                potion_id = potion.Id.Entry,
-                potion_slot = slot,
-                tri_select = triState
-            }
-        };
+            status = "selection_required",
+            next_action = "tri_select_card",
+            selection_type = GetSelectionType(potion.Id.Entry),
+            potion_id = potion.Id.Entry,
+            potion_slot = slot,
+            tri_select = triState
+        });
     }
 
     /// <summary>
@@ -402,19 +372,15 @@ public static class UsePotionHandler
     private static object BuildHandSelectResponse(PotionModel potion, int slot)
     {
         var handState = HandSelectStateBuilder.Build();
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "hand_select_card",
-                selection_type = GetSelectionType(potion.Id.Entry),
-                potion_id = potion.Id.Entry,
-                potion_slot = slot,
-                hand_select = handState
-            }
-        };
+            status = "selection_required",
+            next_action = "hand_select_card",
+            selection_type = GetSelectionType(potion.Id.Entry),
+            potion_id = potion.Id.Entry,
+            potion_slot = slot,
+            hand_select = handState
+        });
     }
 
     /// <summary>
@@ -428,19 +394,15 @@ public static class UsePotionHandler
         PotionModel potion, int slot, NCardGridSelectionScreen gridScreen)
     {
         var gridState = GridCardSelectStateBuilder.Build(gridScreen);
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "grid_select_card",
-                selection_type = GetSelectionType(potion.Id.Entry),
-                potion_id = potion.Id.Entry,
-                potion_slot = slot,
-                grid_card_select = gridState
-            }
-        };
+            status = "selection_required",
+            next_action = "grid_select_card",
+            selection_type = GetSelectionType(potion.Id.Entry),
+            potion_id = potion.Id.Entry,
+            potion_slot = slot,
+            grid_card_select = gridState
+        });
     }
 
     // ── Action helpers ───────────────────────────────────────────────
@@ -471,33 +433,25 @@ public static class UsePotionHandler
         if (finalState == null)
         {
             Logger.Warning("UsePotionAction timed out waiting for completion");
-            return new { ok = false, error = "TIMEOUT", message = "Potion action did not complete in time" };
+            return Responses.Error("TIMEOUT", "Potion action did not complete in time");
         }
 
         if (finalState == GameActionState.Canceled)
         {
             Logger.Info("UsePotionAction was cancelled by the game");
-            return new
-            {
-                ok = false, error = "ACTION_CANCELLED",
-                message = $"Potion '{potion.Title}' action was cancelled by the game"
-            };
+            return Responses.Error("ACTION_CANCELLED", $"Potion '{potion.Title}' action was cancelled by the game");
         }
 
         var results = isInCombat ? CombatHistoryUtils.BuildFromHistory(historyBefore) : [];
         Logger.Info($"UsePotionAction completed with {results.Count} result entries");
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                slot,
-                potion_id = potion.Id.Entry,
-                target = targetCombatId,
-                results
-            }
-        };
+            slot,
+            potion_id = potion.Id.Entry,
+            target = targetCombatId,
+            results
+        });
     }
 
     /// <summary>
@@ -532,24 +486,13 @@ public static class UsePotionHandler
             var availableStr = availablePotions.Count > 0 ? string.Join(", ", availablePotions) : "(none)";
             Logger.Warning($"Potion '{potionId}' not found. Available: {availableStr}");
 
-            return (null!, 0, new
-            {
-                ok = false,
-                error = "POTION_NOT_FOUND",
-                message = $"Potion '{potionId}' not found. Available potions: {availableStr}"
-            });
+            return (null!, 0, Responses.Error("POTION_NOT_FOUND", $"Potion '{potionId}' not found. Available potions: {availableStr}"));
         }
 
         if (nth < 0 || nth >= matchingPotions.Count)
         {
             Logger.Warning($"Potion '{potionId}' has {matchingPotions.Count} copies, but nth={nth} was requested");
-            return (null!, 0, new
-            {
-                ok = false,
-                error = "INVALID_POTION_SLOT",
-                message =
-                    $"Potion '{potionId}' has {matchingPotions.Count} copies. Use nth from 0 to {matchingPotions.Count - 1}."
-            });
+            return (null!, 0, Responses.Error("INVALID_POTION_SLOT", $"Potion '{potionId}' has {matchingPotions.Count} copies. Use nth from 0 to {matchingPotions.Count - 1}."));
         }
 
         var selected = matchingPotions[nth];
