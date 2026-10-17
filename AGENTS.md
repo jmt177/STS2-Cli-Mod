@@ -113,6 +113,7 @@ Verify the mod works by:
 37. `sts2.exe crystal_proceed` - confirms leaving the Crystal Sphere mini-game after divinations are complete
 38. `sts2.exe state --include-pile-details` - confirms draw/discard/exhaust pile contents with full card descriptions
 38a. `sts2.exe state --wait [--wait-timeout <ms>]` - confirms the mod blocks until `is_busy` is false before returning state; every state response carries `state_version` (monotonic, changes only on observable change) and `is_busy`, plus a top-level `player` block on all in-run screens
+38b. `sts2.exe legal_actions [--wait] [--wait-timeout <ms>]` - confirms every legal action for the current screen is listed as `{command, id, args, ...}` entries derived from `state`, via the per-screen registry in `LegalActionsBuilder`
 39. `sts2.exe return_to_menu` - confirms returning to main menu from game over screen
 40. `sts2.exe continue_run` - confirms loading a saved run from the main menu
 41. `sts2.exe new_run` - confirms clicking Singleplayer button (opens submenu or goes to character select)

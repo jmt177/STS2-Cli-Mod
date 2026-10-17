@@ -186,6 +186,7 @@ public static class PipeServer
         {
             // --- State query ---
             ["state"] = StateHandler.HandleRequestAsync,
+            ["legal_actions"] = LegalActionsHandler.HandleRequestAsync,
             ["view_deck"] = _ => ViewDeckHandler.ExecuteAsync(),
 
             // --- Main menu ---

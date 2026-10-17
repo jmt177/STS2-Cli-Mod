@@ -26,8 +26,11 @@ public static class StateHandler
 {
     private static readonly ModLogger Logger = new("StateHandler");
 
-    /// <summary>Default timeout (ms) for <c>state --wait</c> when the caller does not specify one.</summary>
-    private const int DefaultWaitStableTimeoutMs = 10000;
+    /// <summary>
+    ///     Default timeout (ms) for <c>state --wait</c> / <c>legal_actions --wait</c> when the caller
+    ///     does not specify one.
+    /// </summary>
+    internal const int DefaultWaitStableTimeoutMs = 10000;
 
     // Monotonic state version tracking. Access is single-threaded: all state requests
     // are serialized (one pipe connection at a time) and run on the Godot main thread.
@@ -65,7 +68,8 @@ public static class StateHandler
     ///     Gets the current game state.
     /// </summary>
     /// <param name="includePileDetails">Whether to include full card descriptions in pile listings.</param>
-    private static GameStateDto GetState(bool includePileDetails = false)
+    /// <remarks>Internal (not private) so <see cref="LegalActionsHandler" /> can build its own fresh snapshot.</remarks>
+    internal static GameStateDto GetState(bool includePileDetails = false)
     {
         try
         {

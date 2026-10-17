@@ -59,6 +59,50 @@ Recommended loop:
 
 `state --wait` performs step 2's polling inside the mod so the caller does not have to. Action handlers (`play_card`, `end_turn`, `choose_map_node`, menu/embark/reward navigation, ...) already block until their own transition completes, so `--wait` is mainly a safety net for animations that outlive the handler and for screens without a dedicated wait.
 
+#### legal_actions
+
+```
+./sts2 legal_actions [--wait] [--wait-timeout <ms>]
+```
+
+Lists every legal action available on the current screen, derived from the same state the `state`
+command returns. Each entry mirrors the pipe request shape (`command`, `id`, `nth`, `args`, ...) closely
+enough to build the next request directly from it, instead of inferring legality by hand from
+`can_play`, `is_enabled`, `travelable_coords`, and similar fields scattered across `state`.
+
+**Options:** `--wait` / `--wait-timeout <ms>` — same contract as [`state`](#state-synchronization).
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "screen": "COMBAT",
+    "is_busy": false,
+    "state_version": 7,
+    "legal_actions": [
+      { "command": "play_card", "id": "STRIKE_IRONCLAD", "target_required": true, "valid_targets": [1, 2], "label": "Strike" },
+      { "command": "play_card", "id": "DEFEND_IRONCLAD", "label": "Defend" },
+      { "command": "use_potion", "id": "BLOCK_POTION", "label": "Block Potion" },
+      { "command": "end_turn", "label": "End turn" }
+    ]
+  }
+}
+```
+
+**Caveats:**
+- Empty whenever `is_busy` is true — nothing is safe to issue until the game settles.
+- Best-effort, not a guarantee: entries are derived purely from the already-built state DTO, with no
+  extra live game-API calls. A few checks the mod doesn't track at that level (exact "hittable" rules
+  beyond alive/dead, potion belt capacity) aren't applied, and a handful of reward types without an
+  implemented claim command (`CardRemoval`, `LinkedRewardSet`) are omitted entirely. The existing
+  per-command error codes are still authoritative if an action from this list is ever rejected.
+- Card/potion/shop-card entries only set `nth` when more than one copy shares the same `id` (omitted,
+  meaning 0, otherwise) — matching the `--nth` default on the underlying commands.
+- `target_required` + `valid_targets` are set only for `AnyEnemy`-targeted cards/potions; `AnyAlly`/`AnyPlayer`
+  targets are optional (default to the player) and are not flagged as required.
+
 #### view_deck
 
 ```

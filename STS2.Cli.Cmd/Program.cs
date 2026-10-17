@@ -43,6 +43,7 @@ internal static class Program
         // Simple commands (no arguments)
         rootCommand.Subcommands.Add(SimpleCommand.Create("ping", "Test connection to the mod"));
         rootCommand.Subcommands.Add(StateCommand.Create());
+        rootCommand.Subcommands.Add(LegalActionsCommand.Create());
         rootCommand.Subcommands.Add(SimpleCommand.Create("view_deck",
             "View the master deck (available at any point during a run)"));
         rootCommand.Subcommands.Add(SimpleCommand.Create("end_turn", "End the current turn"));
