@@ -95,13 +95,17 @@ enough to build the next request directly from it, instead of inferring legality
 - Empty whenever `is_busy` is true — nothing is safe to issue until the game settles.
 - Best-effort, not a guarantee: entries are derived purely from the already-built state DTO, with no
   extra live game-API calls. A few checks the mod doesn't track at that level (exact "hittable" rules
-  beyond alive/dead, potion belt capacity) aren't applied, and a handful of reward types without an
-  implemented claim command (`CardRemoval`, `LinkedRewardSet`) are omitted entirely. The existing
-  per-command error codes are still authoritative if an action from this list is ever rejected.
+  beyond alive/dead, potion belt capacity) aren't applied. The existing per-command error codes are
+  still authoritative if an action from this list is ever rejected.
+- `LinkedRewardSet` rewards are omitted: the game itself never puts one in a reward button (confirmed
+  unreachable in the current version, not a gap).
 - Card/potion/shop-card entries only set `nth` when more than one copy shares the same `id` (omitted,
   meaning 0, otherwise) — matching the `--nth` default on the underlying commands.
-- `target_required` + `valid_targets` are set only for `AnyEnemy`-targeted cards/potions; `AnyAlly`/`AnyPlayer`
-  targets are optional (default to the player) and are not flagged as required.
+- `target_required` + `valid_targets` are set only for `AnyEnemy`-targeted cards/potions in combat;
+  `AnyAlly`/`AnyPlayer` targets are optional (default to the player) and are not flagged as required,
+  and AnyTime potions used outside combat never take a target at all.
+- AnyTime-usage potions (Blood Potion, Fruit Juice, Entropic Brew, Foul Potion, ...) appear as
+  `use_potion` entries on every in-run screen, not just combat.
 
 #### view_deck
 
@@ -342,7 +346,9 @@ Buy the card removal service from the shop. Opens a grid card selection screen (
 ./sts2 reward_claim --type <type> [--id <id>] [--nth <n>]
 ```
 
-Claim a non-card reward. Types: `gold`, `potion`, `relic`, `special_card`. `--id` required for all except `gold`.
+Claim a non-card reward. Types: `gold`, `potion`, `relic`, `special_card`, `card_removal`. `--id` required for all except `gold` and `card_removal`.
+
+`card_removal` is the exception to the usual "claim and done" flow: it opens a card selection screen instead of claiming instantly. The response has `status: "selection_required"` and `next_action: "grid_select_card"` (plus an inline `grid_card_select` snapshot) — follow up with `grid_select_card <card_id>` to pick the card to remove, or `grid_select_skip` to cancel.
 
 #### reward_choose_card / reward_skip_card
 
@@ -865,7 +871,6 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `USE_CHOOSE_CARD` | Used `reward_claim` on card reward |
 | `CARD_NOT_FOUND` | Card ID not found in card reward |
 | `POTION_BELT_FULL` | No empty potion slots |
-| `NOT_SUPPORTED` | Unsupported reward type |
 | `CLAIM_FAILED` | Unknown failure |
 
 **Proceed** (`proceed`):

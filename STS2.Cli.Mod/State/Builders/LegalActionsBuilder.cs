@@ -49,7 +49,18 @@ public static class LegalActionsBuilder
         if (state.IsBusy)
             return [];
 
-        return Builders.TryGetValue(state.Screen, out var builder) ? builder(state) : [];
+        var actions = Builders.TryGetValue(state.Screen, out var builder) ? builder(state) : [];
+
+        // AnyTime-usage potions (Blood Potion, Fruit Juice, Entropic Brew, Foul Potion, ...) are
+        // gated purely on RunManager.IsInProgress, not on screen -- see
+        // UsePotionHandler.ValidatePotionUsage's PotionUsage.AnyTime case, which never checks the
+        // current screen. So they're appended here for every in-run screen instead of duplicated
+        // into each room's builder. Combat is excluded because BuildCombatActions already lists
+        // every usable potion there (CombatOnly and AnyTime alike), not just the AnyTime ones.
+        if (state.Player != null && state.Screen != "COMBAT")
+            actions.AddRange(BuildAnyTimePotionActions(state));
+
+        return actions;
     }
 
     /// <summary>Returns the 0-based occurrence count of <paramref name="key" /> seen so far, then increments it.</summary>
@@ -118,6 +129,30 @@ public static class LegalActionsBuilder
 
         if (cs.CanEmbark)
             actions.Add(new LegalActionDto { Command = "embark", Label = "Start the run" });
+
+        return actions;
+    }
+
+    /// <summary>
+    ///     AnyTime potions usable on any in-run screen outside combat. No <c>--target</c> is ever
+    ///     allowed here (<c>UsePotionHandler</c> rejects any target outside combat regardless of the
+    ///     potion's own target type), so <see cref="LegalActionDto.TargetRequired" /> is never set.
+    /// </summary>
+    private static List<LegalActionDto> BuildAnyTimePotionActions(GameStateDto state)
+    {
+        var actions = new List<LegalActionDto>();
+
+        var seen = new Dictionary<string, int>();
+        foreach (var potion in state.Player!.Potions)
+        {
+            var nth = NextNth(seen, potion.Id);
+            if (potion.Usage != "AnyTime") continue;
+
+            actions.Add(new LegalActionDto
+            {
+                Command = "use_potion", Id = potion.Id, Nth = nth > 0 ? nth : null, Label = potion.Name
+            });
+        }
 
         return actions;
     }
@@ -359,14 +394,17 @@ public static class LegalActionsBuilder
         var seenByType = new Dictionary<string, int>();
         foreach (var reward in rewards.Rewards)
         {
-            // reward_claim only supports these four types; Card goes through reward_choose_card /
-            // reward_skip_card below, and CardRemoval / LinkedRewardSet have no claim command yet.
+            // reward_claim supports these five types; Card goes through reward_choose_card /
+            // reward_skip_card below. LinkedRewardSet is omitted: NRewardButton.SetReward throws if
+            // given one, so the game itself never puts one in the reward button list we read from —
+            // confirmed unreachable, not a gap.
             var rewardType = reward.Type switch
             {
                 "Gold" => "gold",
                 "Potion" => "potion",
                 "Relic" => "relic",
                 "SpecialCard" => "special_card",
+                "CardRemoval" => "card_removal",
                 _ => null
             };
 

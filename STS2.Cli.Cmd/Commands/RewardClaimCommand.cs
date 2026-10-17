@@ -15,14 +15,15 @@ internal static class RewardClaimCommand
     {
         var typeOption = new Option<string>("--type")
         {
-            Description = "Reward type: gold, potion, relic, special_card",
+            Description = "Reward type: gold, potion, relic, special_card, card_removal",
             Required = true,
             CustomParser = result =>
             {
                 var value = result.Tokens.Single().Value.ToLower();
-                if (value is "gold" or "potion" or "relic" or "special_card")
+                if (value is "gold" or "potion" or "relic" or "special_card" or "card_removal")
                     return value;
-                result.AddError($"Invalid reward type '{value}'. Must be one of: gold, potion, relic, special_card");
+                result.AddError(
+                    $"Invalid reward type '{value}'. Must be one of: gold, potion, relic, special_card, card_removal");
                 return null!;
             }
         };
