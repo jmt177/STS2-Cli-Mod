@@ -113,7 +113,7 @@ internal static class CommandExecutor
                 "NO_PROCEED_AVAILABLE" or "PROCEED_BUTTON_NOT_FOUND" or
                 "PROCEED_NOT_VISIBLE" or "PROCEED_NOT_ENABLED" or
                 "EVENT_NOT_FINISHED" or "POTION_BELT_FULL" or
-                "NOT_SUPPORTED" or "CLAIM_FAILED" or
+                "NOT_SUPPORTED" or "CLAIM_FAILED" or "CONSOLE_NOT_AVAILABLE" or "COMMAND_FAILED" or
                 "NOT_IN_EVENT" or "NO_EVENT_LAYOUT" or
                 "OPTION_LOCKED" or "OPTION_BUTTON_NOT_FOUND" or
                 "NOT_ANCIENT_EVENT" or "NOT_IN_DIALOGUE" or "DIALOGUE_HITBOX_NOT_FOUND" or

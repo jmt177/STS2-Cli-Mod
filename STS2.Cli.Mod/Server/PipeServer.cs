@@ -189,6 +189,9 @@ public static class PipeServer
             ["legal_actions"] = LegalActionsHandler.HandleRequestAsync,
             ["view_deck"] = _ => ViewDeckHandler.ExecuteAsync(),
 
+            // --- Testing aid: raw dev-console passthrough (see ConsoleExecHandler remarks) ---
+            ["console_exec"] = ConsoleExecHandler.ExecuteAsync,
+
             // --- Main menu ---
             ["continue_run"] = _ => ContinueRunHandler.ExecuteAsync(),
             ["new_run"] = _ => NewRunHandler.ExecuteAsync(),
