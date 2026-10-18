@@ -194,6 +194,7 @@ public static class PipeServer
             ["new_run"] = _ => NewRunHandler.ExecuteAsync(),
             ["abandon_run"] = _ => AbandonRunHandler.ExecuteAsync(),
             ["choose_game_mode"] = ChooseGameModeHandler.ExecuteAsync,
+            ["switch_profile"] = SwitchProfileHandler.ExecuteAsync,
 
             // --- Character select ---
             ["select_character"] = SelectCharacterHandler.ExecuteAsync,

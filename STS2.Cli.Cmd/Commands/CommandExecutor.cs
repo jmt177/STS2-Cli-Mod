@@ -157,7 +157,7 @@ internal static class CommandExecutor
                 "INVALID_BUNDLE_INDEX" or
                 "INVALID_TOOL" or "CELL_NOT_FOUND" or
                 "ITEM_NOT_FOUND" or
-                "INVALID_GAME_MODE" => ExitInvalidParam,
+                "INVALID_GAME_MODE" or "INVALID_PROFILE_ID" => ExitInvalidParam,
 
             // Timeout
             "TIMEOUT" or "EVENT_TIMEOUT" => ExitTimeout,

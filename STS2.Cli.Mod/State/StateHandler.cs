@@ -102,6 +102,9 @@ public static class StateHandler
                 case "SINGLEPLAYER_SUBMENU":
                     state.SingleplayerSubmenu = SingleplayerSubmenuStateBuilder.Build();
                     break;
+                case "PROFILE_SCREEN":
+                    state.ProfileScreen = ProfileScreenStateBuilder.Build();
+                    break;
                 case "MENU":
                     state.Menu = MenuStateBuilder.Build();
                     break;
@@ -218,7 +221,7 @@ public static class StateHandler
         {
             switch (screen)
             {
-                case "MENU" or "SINGLEPLAYER_SUBMENU" or "CHARACTER_SELECT":
+                case "MENU" or "SINGLEPLAYER_SUBMENU" or "CHARACTER_SELECT" or "PROFILE_SCREEN":
                     return false;
 
                 // Between rooms / loading / fade transitions during an active run.
@@ -256,6 +259,7 @@ public static class StateHandler
         // --- Pre-run: main menu and its submenu stack ---
         if (UiUtils.FindCharacterSelectScreen() != null) return "CHARACTER_SELECT";
         if (UiUtils.FindSingleplayerSubmenu() != null) return "SINGLEPLAYER_SUBMENU";
+        if (UiUtils.FindProfileScreen() != null) return "PROFILE_SCREEN";
         if (UiUtils.FindMainMenu() != null) return "MENU";
 
         // All screens below require an active run

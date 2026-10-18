@@ -21,6 +21,7 @@ public static class LegalActionsBuilder
     {
         ["MENU"] = BuildMenuActions,
         ["SINGLEPLAYER_SUBMENU"] = BuildSingleplayerSubmenuActions,
+        ["PROFILE_SCREEN"] = BuildProfileScreenActions,
         ["CHARACTER_SELECT"] = BuildCharacterSelectActions,
         ["MAP"] = BuildMapActions,
         ["COMBAT"] = BuildCombatActions,
@@ -104,6 +105,24 @@ public static class LegalActionsBuilder
             actions.Add(new LegalActionDto { Command = "choose_game_mode", Id = "daily", Label = "Daily challenge" });
         if (submenu.CustomAvailable)
             actions.Add(new LegalActionDto { Command = "choose_game_mode", Id = "custom", Label = "Custom run" });
+
+        return actions;
+    }
+
+    private static List<LegalActionDto> BuildProfileScreenActions(GameStateDto state)
+    {
+        var actions = new List<LegalActionDto>();
+        var profileScreen = state.ProfileScreen;
+        if (profileScreen == null) return actions;
+
+        // The button for the currently active profile just closes this screen in the real UI
+        // (no switch happens), so it isn't a meaningful "switch_profile" entry.
+        for (var id = 1; id <= 3; id++)
+            if (id != profileScreen.CurrentProfileId)
+                actions.Add(new LegalActionDto
+                {
+                    Command = "switch_profile", Args = [id], Label = $"Switch to profile {id}"
+                });
 
         return actions;
     }

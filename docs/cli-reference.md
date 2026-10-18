@@ -151,6 +151,16 @@ Abandon the current saved run from the main menu. Only available when `menu.has_
 
 Select a game mode from the singleplayer submenu. Only available when `screen` is `SINGLEPLAYER_SUBMENU`. Valid modes: `standard`, `daily`, `custom`. After selecting, the screen transitions to character select (for standard) or the corresponding mode screen.
 
+#### switch_profile
+
+```
+./sts2 switch_profile <profile_id>
+```
+
+Switches to one of the game's 3 fixed local save-profile slots (`profile_id` 1-3), via the main menu's profile screen — the same path the in-game "change profile" button uses. Only available when `screen` is `MENU`.
+
+Each profile is a fully independent save (deck/relic/run history, current run, progress); switching only loads the target profile's own data and never writes to the profile being switched away from. Primarily useful for testing: switch to an unused profile slot to get a disposable save to freely exercise commands on without touching a real profile, then `switch_profile` back when done. If `profile_id` is already the active profile, returns `{"profile_id": N, "already_active": true}` without opening the screen.
+
 ---
 
 ### Character Select
@@ -738,7 +748,7 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `UI_NOT_FOUND` | Required UI element not found |
 | `TIMEOUT` | Action did not complete within time limit |
 
-**Main Menu** (`continue_run`, `new_run`, `abandon_run`, `choose_game_mode`):
+**Main Menu** (`continue_run`, `new_run`, `abandon_run`, `choose_game_mode`, `switch_profile`):
 
 | Error | Cause |
 |-------|-------|
@@ -748,6 +758,7 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `NOT_ON_SINGLEPLAYER_SUBMENU` | Not on singleplayer submenu (choose_game_mode) |
 | `INVALID_GAME_MODE` | Mode not one of standard, daily, custom |
 | `MODE_NOT_UNLOCKED` | Game mode not yet unlocked |
+| `INVALID_PROFILE_ID` | Profile id not 1-3 (switch_profile) |
 | `BUTTON_NOT_FOUND` | UI button not found |
 | `BUTTON_DISABLED` | UI button is disabled |
 | `ACTION_FAILED` | Failed to execute menu action |

@@ -138,6 +138,9 @@ internal static class Program
         rootCommand.Subcommands.Add(SimpleCommand.Create("abandon_run",
             "Abandon the current saved run from the main menu"));
         rootCommand.Subcommands.Add(ChooseGameModeCommand.Create());
+        rootCommand.Subcommands.Add(IndexedCommand.Create(
+            "switch_profile", "Switch to one of the game's 3 local save profiles (from the main menu)",
+            new Argument<int>("profile_id") { Description = "Profile id (1-3)" }));
 
         // Bug reporting command (local-only, no pipe required)
         rootCommand.Subcommands.Add(ReportBugCommand.Create());

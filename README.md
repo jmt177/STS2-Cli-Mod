@@ -141,6 +141,7 @@ For the full command reference with detailed parameters and response formats, se
 | `continue_run` | Continue a saved run |
 | `abandon_run` | Abandon the saved run |
 | `choose_game_mode <mode>` | Select game mode (standard, daily, custom) |
+| `switch_profile <profile_id>` | Switch to one of the game's 3 local save profiles (1-3) |
 
 ### Character Select
 

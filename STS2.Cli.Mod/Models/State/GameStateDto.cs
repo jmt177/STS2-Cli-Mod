@@ -141,4 +141,11 @@ public class GameStateDto
     ///     Contains information about available game modes (standard, daily, custom).
     /// </summary>
     public SingleplayerSubmenuStateDto? SingleplayerSubmenu { get; set; }
+
+    /// <summary>
+    ///     Profile screen state if the profile screen is open, null otherwise.
+    ///     Lets a caller switch between the game's 3 local save profiles (e.g. to drive a
+    ///     disposable profile for testing without touching the player's main profile).
+    /// </summary>
+    public ProfileScreenStateDto? ProfileScreen { get; set; }
 }

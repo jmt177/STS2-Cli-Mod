@@ -119,6 +119,7 @@ Verify the mod works by:
 41. `sts2.exe new_run` - confirms clicking Singleplayer button (opens submenu or goes to character select)
 42. `sts2.exe abandon_run` - confirms abandoning the saved run from the main menu
 43. `sts2.exe choose_game_mode <mode>` - confirms game mode selection (standard, daily, custom) from singleplayer submenu
+43a. `sts2.exe switch_profile <profile_id>` - confirms switching between the game's 3 local save profiles from the main menu; switching only loads the target profile's data and never writes to the profile being switched away from
 44. `sts2.exe report_bug --title <title> --description <desc> [--last-command <cmd>] [--last-response <json>] [--severity <level>] [--labels <labels>]` - saves a structured bug report to local file with optional game state snapshot
 
 ## Code Style Guidelines
