@@ -54,15 +54,15 @@ public static class OpenChestHandler
             // --- Guard: Check treasure room ---
             var treasureRoom = NRun.Instance?.TreasureRoom;
             if (treasureRoom == null || !treasureRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_TREASURE_ROOM", message = "Not currently in a treasure room" };
+                return Responses.Error("NOT_IN_TREASURE_ROOM", "Not currently in a treasure room");
 
             // --- Guard: Check chest not already opened ---
             if (GetHasChestBeenOpened(treasureRoom))
-                return new { ok = false, error = "CHEST_ALREADY_OPENED", message = "Chest has already been opened" };
+                return Responses.Error("CHEST_ALREADY_OPENED", "Chest has already been opened");
 
             // --- Get chest button ---
             if (ChestButtonField?.GetValue(treasureRoom) is not NButton chestButton)
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Chest button not found" };
+                return Responses.Error("UI_NOT_FOUND", "Chest button not found");
 
             // --- Fire-and-forget: simulate OnChestButtonReleased ---
             // The game calls TaskHelper.RunSafely(OpenChest()) then disables the chest button.
@@ -93,20 +93,16 @@ public static class OpenChestHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"After opening chest, detected screen: {screen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "OPEN_CHEST",
-                    screen
-                }
-            };
+                action = "OPEN_CHEST",
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to open chest: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

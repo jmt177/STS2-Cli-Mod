@@ -31,12 +31,7 @@ public static class ChooseMapNodeHandler
     {
         // --- Parse arguments ---
         if (request.Args == null || request.Args.Length < 2)
-            return new
-            {
-                ok = false,
-                error = "MISSING_ARGUMENT",
-                message = "choose_map_node requires col and row arguments (args[0]=col, args[1]=row)"
-            };
+            return Responses.Error("MISSING_ARGUMENT", "choose_map_node requires col and row arguments (args[0]=col, args[1]=row)");
 
         var col = request.Args[0];
         var row = request.Args[1];
@@ -47,56 +42,31 @@ public static class ChooseMapNodeHandler
             // --- Validate map screen is open ---
             var mapScreen = NMapScreen.Instance;
             if (mapScreen is not { IsOpen: true })
-                return new
-                {
-                    ok = false,
-                    error = "NOT_ON_MAP",
-                    message = "Map screen is not open"
-                };
+                return Responses.Error("NOT_ON_MAP", "Map screen is not open");
 
             // --- Validate run state ---
             var runState = RunManager.Instance.DebugOnlyGetState();
             if (runState == null)
-                return new
-                {
-                    ok = false,
-                    error = "NO_RUN_STATE",
-                    message = "No active run"
-                };
+                return Responses.Error("NO_RUN_STATE", "No active run");
 
             // --- Validate target node exists ---
             var targetCoord = new MapCoord(col, row);
             var map = runState.Map;
             var targetPoint = map.GetPoint(targetCoord);
             if (targetPoint == null)
-                return new
-                {
-                    ok = false,
-                    error = "NODE_NOT_FOUND",
-                    message = $"No map node at ({col}, {row})"
-                };
+                return Responses.Error("NODE_NOT_FOUND", $"No map node at ({col}, {row})");
 
             // --- Validate node is travelable via UI state ---
             var nodeState = GetMapPointState(mapScreen, targetCoord);
             if (nodeState != MapPointState.Travelable)
             {
                 var stateStr = nodeState?.ToString() ?? "UNKNOWN";
-                return new
-                {
-                    ok = false,
-                    error = "NOT_TRAVELABLE",
-                    message = $"Node at ({col}, {row}) is not travelable (state: {stateStr})"
-                };
+                return Responses.Error("NOT_TRAVELABLE", $"Node at ({col}, {row}) is not travelable (state: {stateStr})");
             }
 
             // --- Check travel is enabled ---
             if (!mapScreen.IsTravelEnabled)
-                return new
-                {
-                    ok = false,
-                    error = "TRAVEL_DISABLED",
-                    message = "Map travel is currently disabled (already traveling or animation in progress)"
-                };
+                return Responses.Error("TRAVEL_DISABLED", "Map travel is currently disabled (already traveling or animation in progress)");
 
             // --- Execute travel ---
             Logger.Info($"Traveling to map node at ({col}, {row}), type={targetPoint.PointType}");
@@ -110,22 +80,18 @@ public static class ChooseMapNodeHandler
 
             Logger.Info($"Travel to ({col}, {row}) completed");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    col,
-                    row,
-                    type = targetPoint.PointType.ToString().ToUpperInvariant(),
-                    action = "TRAVEL"
-                }
-            };
+                col,
+                row,
+                type = targetPoint.PointType.ToString().ToUpperInvariant(),
+                action = "TRAVEL"
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to choose map node: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

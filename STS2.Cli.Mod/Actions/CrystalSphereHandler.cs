@@ -40,7 +40,7 @@ public static class CrystalSphereHandler
     public static async Task<object> HandleSetToolAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Tool type required: 'big' or 'small'" };
+            return Responses.Error("MISSING_ARGUMENT", "Tool type required: 'big' or 'small'");
 
         var tool = request.Id.ToLowerInvariant();
         Logger.Info($"Requested to set Crystal Sphere tool to '{tool}'");
@@ -55,11 +55,7 @@ public static class CrystalSphereHandler
     public static async Task<object> HandleClickCellAsync(Request request)
     {
         if (request.Args == null || request.Args.Length < 2)
-            return new
-            {
-                ok = false, error = "MISSING_ARGUMENT",
-                message = "Cell coordinates required: x (args[0]) and y (args[1])"
-            };
+            return Responses.Error("MISSING_ARGUMENT", "Cell coordinates required: x (args[0]) and y (args[1])");
 
         var x = request.Args[0];
         var y = request.Args[1];
@@ -90,20 +86,12 @@ public static class CrystalSphereHandler
         {
             // --- Guard: Validate tool name ---
             if (tool is not ("big" or "small"))
-                return new
-                {
-                    ok = false, error = "INVALID_TOOL",
-                    message = $"Invalid tool '{tool}'. Must be 'big' or 'small'."
-                };
+                return Responses.Error("INVALID_TOOL", $"Invalid tool '{tool}'. Must be 'big' or 'small'.");
 
             // --- Guard: Check Crystal Sphere screen ---
             var screen = UiUtils.FindScreenInOverlay<NCrystalSphereScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false, error = "NOT_IN_CRYSTAL_SPHERE",
-                    message = "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_CRYSTAL_SPHERE", "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Check tool buttons are visible (hidden after minigame finishes) ---
             var bigButton = screen.GetNodeOrNull<NDivinationButton>("%BigDivinationButton");
@@ -111,20 +99,12 @@ public static class CrystalSphereHandler
             var targetButton = tool == "big" ? bigButton : smallButton;
 
             if (targetButton is not { Visible: true })
-                return new
-                {
-                    ok = false, error = "TOOL_NOT_AVAILABLE",
-                    message = $"The '{tool}' divination tool button is not available (minigame may have finished)."
-                };
+                return Responses.Error("TOOL_NOT_AVAILABLE", $"The '{tool}' divination tool button is not available (minigame may have finished).");
 
             // --- Guard: Check if tool is already active ---
             var outline = targetButton.GetNodeOrNull<Control>("%Outline");
             if (outline?.Visible == true)
-                return new
-                {
-                    ok = false, error = "TOOL_ALREADY_ACTIVE",
-                    message = $"The '{tool}' divination tool is already active."
-                };
+                return Responses.Error("TOOL_ALREADY_ACTIVE", $"The '{tool}' divination tool is already active.");
 
             // --- Click the tool button ---
             Logger.Info($"Clicking {tool} divination button");
@@ -135,21 +115,17 @@ public static class CrystalSphereHandler
 
             // --- Return result ---
             var resultScreen = StateHandler.DetectScreen();
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "CRYSTAL_SET_TOOL",
-                    tool,
-                    screen = resultScreen
-                }
-            };
+                action = "CRYSTAL_SET_TOOL",
+                tool,
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to set Crystal Sphere tool: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -164,29 +140,17 @@ public static class CrystalSphereHandler
             // --- Guard: Check Crystal Sphere screen ---
             var screen = UiUtils.FindScreenInOverlay<NCrystalSphereScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false, error = "NOT_IN_CRYSTAL_SPHERE",
-                    message = "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_CRYSTAL_SPHERE", "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Check minigame not finished ---
             var entity = GetEntity(screen);
             if (entity is { IsFinished: true })
-                return new
-                {
-                    ok = false, error = "MINIGAME_FINISHED",
-                    message = "The Crystal Sphere mini-game has finished. Use 'crystal_proceed' to leave."
-                };
+                return Responses.Error("MINIGAME_FINISHED", "The Crystal Sphere mini-game has finished. Use 'crystal_proceed' to leave.");
 
             // --- Guard: Find the cell node ---
             var cellContainer = screen.GetNodeOrNull<Control>("%Cells");
             if (cellContainer == null)
-                return new
-                {
-                    ok = false, error = "CELL_NOT_FOUND",
-                    message = "Could not find the cells container on the Crystal Sphere screen."
-                };
+                return Responses.Error("CELL_NOT_FOUND", "Could not find the cells container on the Crystal Sphere screen.");
 
             var cellNodes = UiUtils.FindAll<NCrystalSphereCell>(cellContainer);
             NCrystalSphereCell? targetCell = null;
@@ -198,20 +162,11 @@ public static class CrystalSphereHandler
                 }
 
             if (targetCell == null)
-                return new
-                {
-                    ok = false, error = "CELL_NOT_FOUND",
-                    message = $"No cell found at coordinates ({x}, {y})."
-                };
+                return Responses.Error("CELL_NOT_FOUND", $"No cell found at coordinates ({x}, {y}).");
 
             // --- Guard: Cell must be clickable (hidden and visible) ---
             if (!targetCell.Entity.IsHidden || !targetCell.Visible)
-                return new
-                {
-                    ok = false, error = "CELL_NOT_CLICKABLE",
-                    message =
-                        $"Cell at ({x}, {y}) is not clickable (IsHidden={targetCell.Entity.IsHidden}, Visible={targetCell.Visible})."
-                };
+                return Responses.Error("CELL_NOT_CLICKABLE", $"Cell at ({x}, {y}) is not clickable (IsHidden={targetCell.Entity.IsHidden}, Visible={targetCell.Visible}).");
 
             // --- Click the cell via EmitSignal (proven pattern from AutoSlay) ---
             Logger.Info($"Clicking Crystal Sphere cell at ({x}, {y})");
@@ -230,23 +185,19 @@ public static class CrystalSphereHandler
             var resultScreen = StateHandler.DetectScreen();
             var divLeft = entity?.DivinationCount ?? 0;
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "CRYSTAL_CLICK_CELL",
-                    x,
-                    y,
-                    divinations_left = divLeft,
-                    screen = resultScreen
-                }
-            };
+                action = "CRYSTAL_CLICK_CELL",
+                x,
+                y,
+                divinations_left = divLeft,
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to click Crystal Sphere cell: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -260,21 +211,12 @@ public static class CrystalSphereHandler
             // --- Guard: Check Crystal Sphere screen ---
             var screen = UiUtils.FindScreenInOverlay<NCrystalSphereScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false, error = "NOT_IN_CRYSTAL_SPHERE",
-                    message = "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_CRYSTAL_SPHERE", "Not in Crystal Sphere mini-game. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Check proceed button is enabled ---
             var proceedButton = screen.GetNodeOrNull<NProceedButton>("%ProceedButton");
             if (proceedButton is not { Visible: true, IsEnabled: true })
-                return new
-                {
-                    ok = false, error = "CANNOT_PROCEED",
-                    message =
-                        "Proceed button is not enabled. The mini-game must finish (use all divinations) before proceeding."
-                };
+                return Responses.Error("CANNOT_PROCEED", "Proceed button is not enabled. The mini-game must finish (use all divinations) before proceeding.");
 
             // --- Click proceed ---
             Logger.Info("Clicking Crystal Sphere proceed button");
@@ -291,20 +233,16 @@ public static class CrystalSphereHandler
             var resultScreen = StateHandler.DetectScreen();
             Logger.Info($"After proceeding from Crystal Sphere, detected screen: {resultScreen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "CRYSTAL_PROCEED",
-                    screen = resultScreen
-                }
-            };
+                action = "CRYSTAL_PROCEED",
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to proceed from Crystal Sphere: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

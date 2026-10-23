@@ -40,7 +40,7 @@ public static class ChooseRestOptionHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Option ID required (e.g., HEAL, SMITH)" };
+            return Responses.Error("MISSING_ARGUMENT", "Option ID required (e.g., HEAL, SMITH)");
 
         var optionId = request.Id.ToUpperInvariant();
         Logger.Info($"Requested to choose rest site option: {optionId}");
@@ -50,7 +50,7 @@ public static class ChooseRestOptionHandler
             // --- Guard: Check rest site room ---
             var restSiteRoom = NRestSiteRoom.Instance;
             if (restSiteRoom == null || !restSiteRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_AT_REST_SITE", message = "Not currently at a rest site" };
+                return Responses.Error("NOT_AT_REST_SITE", "Not currently at a rest site");
 
             // --- Guard: Find the option by ID ---
             var options = restSiteRoom.Options;
@@ -63,24 +63,14 @@ public static class ChooseRestOptionHandler
                 }
 
             if (optionIndex < 0)
-                return new
-                {
-                    ok = false,
-                    error = "OPTION_NOT_FOUND",
-                    message =
-                        $"Rest site option '{optionId}' not found. Available: {string.Join(", ", options.Select(o => o.OptionId))}"
-                };
+                return Responses.Error("OPTION_NOT_FOUND",
+                    $"Rest site option '{optionId}' not found. Available: {string.Join(", ", options.Select(o => o.OptionId))}");
 
             var selectedOption = options[optionIndex];
 
             // --- Guard: Check option is enabled ---
             if (!selectedOption.IsEnabled)
-                return new
-                {
-                    ok = false,
-                    error = "OPTION_DISABLED",
-                    message = $"Rest site option '{optionId}' is disabled"
-                };
+                return Responses.Error("OPTION_DISABLED", $"Rest site option '{optionId}' is disabled");
 
             // --- Disable options to prevent double-clicks (mirrors NRestSiteButton) ---
             restSiteRoom.DisableOptions();
@@ -117,20 +107,16 @@ public static class ChooseRestOptionHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"After choosing '{optionId}', detected screen: {screen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    option_id = optionId,
-                    screen
-                }
-            };
+                option_id = optionId,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to choose rest site option: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

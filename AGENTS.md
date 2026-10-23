@@ -2,12 +2,11 @@
 
 ## Language Policy
 
-- Communicate with the user in Chinese (中文).
 - All code, comments, documentation, commit messages, and scripts must be in English.
 
 A CLI control mod for Slay the Spire 2. Two independent .NET 9 / C# 12 projects communicating via Named Pipe with JSON messages.
 
-**Supported game version: v0.103.0** (Steam Build 22722129, 2026-04-09)
+**Supported game version: v0.111.0** (Steam Build 24724944, commit 41cef1ea, 2026-08-13)
 
 ## Architecture
 
@@ -112,11 +111,14 @@ Verify the mod works by:
 36. `sts2.exe crystal_click_cell <x> <y>` - confirms Crystal Sphere cell click with fog clearing
 37. `sts2.exe crystal_proceed` - confirms leaving the Crystal Sphere mini-game after divinations are complete
 38. `sts2.exe state --include-pile-details` - confirms draw/discard/exhaust pile contents with full card descriptions
+38a. `sts2.exe state --wait [--wait-timeout <ms>]` - confirms the mod blocks until `is_busy` is false before returning state; every state response carries `state_version` (monotonic, changes only on observable change) and `is_busy`, plus a top-level `player` block on all in-run screens
+38b. `sts2.exe legal_actions [--wait] [--wait-timeout <ms>]` - confirms every legal action for the current screen is listed as `{command, id, args, ...}` entries derived from `state`, via the per-screen registry in `LegalActionsBuilder`
 39. `sts2.exe return_to_menu` - confirms returning to main menu from game over screen
 40. `sts2.exe continue_run` - confirms loading a saved run from the main menu
 41. `sts2.exe new_run` - confirms clicking Singleplayer button (opens submenu or goes to character select)
 42. `sts2.exe abandon_run` - confirms abandoning the saved run from the main menu
 43. `sts2.exe choose_game_mode <mode>` - confirms game mode selection (standard, daily, custom) from singleplayer submenu
+43a. `sts2.exe switch_profile <profile_id>` - confirms switching between the game's 3 local save profiles from the main menu; switching only loads the target profile's data and never writes to the profile being switched away from
 44. `sts2.exe report_bug --title <title> --description <desc> [--last-command <cmd>] [--last-response <json>] [--severity <level>] [--labels <labels>]` - saves a structured bug report to local file with optional game state snapshot
 
 ## Code Style Guidelines

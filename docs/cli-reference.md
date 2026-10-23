@@ -30,13 +30,82 @@ Test connection. Returns `{"ok": true}`.
 #### state
 
 ```
-./sts2 state [--include-pile-details]
+./sts2 state [--include-pile-details] [--wait] [--wait-timeout <ms>]
 ```
 
 Get full game state. See [Game State Structure](#game-state-structure) below.
 
 **Options:**
 - `--include-pile-details` — Include full card descriptions in draw/discard/exhaust pile listings. Default is off to reduce payload size.
+- `--wait` — Block until the game is no longer busy (`is_busy` is `false`) before returning, so the state reflects a settled world. If the timeout elapses first, the state is returned anyway with a `warning` field and `is_busy` still `true`.
+- `--wait-timeout <ms>` — Timeout for `--wait`, in milliseconds. Default `10000`.
+
+See [State Synchronization](#state-synchronization) for the recommended action loop.
+
+#### State Synchronization
+
+Every `state` response carries two fields for pacing an automated loop:
+
+- `state_version` — a monotonic integer that increments **only when the observable state changes** between two `state` reads. It is not a frame counter: a settled game returns the same value on repeated calls. Compare it before and after an action to tell whether anything actually changed.
+- `is_busy` — `true` while the game is mid-transition or still resolving a previous action: room/loading transitions during a run, combat while it is not the player's play phase or player actions are disabled (enemy turn, animations, queued card effects), and map travel animations. It is `false` on every click-driven screen (events, shop, rest, rewards, card/relic/bundle selection), whose actions are always safe to issue when that screen is shown.
+
+Recommended loop:
+
+```
+1. sts2 <action ...>            # issue one action
+2. sts2 state --wait            # block until is_busy == false, then read
+3. act on the returned state; optionally diff state_version against the pre-action value
+```
+
+`state --wait` performs step 2's polling inside the mod so the caller does not have to. Action handlers (`play_card`, `end_turn`, `choose_map_node`, menu/embark/reward navigation, ...) already block until their own transition completes, so `--wait` is mainly a safety net for animations that outlive the handler and for screens without a dedicated wait.
+
+#### legal_actions
+
+```
+./sts2 legal_actions [--wait] [--wait-timeout <ms>]
+```
+
+Lists every legal action available on the current screen, derived from the same state the `state`
+command returns. Each entry mirrors the pipe request shape (`command`, `id`, `nth`, `args`, ...) closely
+enough to build the next request directly from it, instead of inferring legality by hand from
+`can_play`, `is_enabled`, `travelable_coords`, and similar fields scattered across `state`.
+
+**Options:** `--wait` / `--wait-timeout <ms>` — same contract as [`state`](#state-synchronization).
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "screen": "COMBAT",
+    "is_busy": false,
+    "state_version": 7,
+    "legal_actions": [
+      { "command": "play_card", "id": "STRIKE_IRONCLAD", "target_required": true, "valid_targets": [1, 2], "label": "Strike" },
+      { "command": "play_card", "id": "DEFEND_IRONCLAD", "label": "Defend" },
+      { "command": "use_potion", "id": "BLOCK_POTION", "label": "Block Potion" },
+      { "command": "end_turn", "label": "End turn" }
+    ]
+  }
+}
+```
+
+**Caveats:**
+- Empty whenever `is_busy` is true — nothing is safe to issue until the game settles.
+- Best-effort, not a guarantee: entries are derived purely from the already-built state DTO, with no
+  extra live game-API calls. A few checks the mod doesn't track at that level (exact "hittable" rules
+  beyond alive/dead, potion belt capacity) aren't applied. The existing per-command error codes are
+  still authoritative if an action from this list is ever rejected.
+- `LinkedRewardSet` rewards are omitted: the game itself never puts one in a reward button (confirmed
+  unreachable in the current version, not a gap).
+- Card/potion/shop-card entries only set `nth` when more than one copy shares the same `id` (omitted,
+  meaning 0, otherwise) — matching the `--nth` default on the underlying commands.
+- `target_required` + `valid_targets` are set only for `AnyEnemy`-targeted cards/potions in combat;
+  `AnyAlly`/`AnyPlayer` targets are optional (default to the player) and are not flagged as required,
+  and AnyTime potions used outside combat never take a target at all.
+- AnyTime-usage potions (Blood Potion, Fruit Juice, Entropic Brew, Foul Potion, ...) appear as
+  `use_potion` entries on every in-run screen, not just combat.
 
 #### view_deck
 
@@ -81,6 +150,16 @@ Abandon the current saved run from the main menu. Only available when `menu.has_
 ```
 
 Select a game mode from the singleplayer submenu. Only available when `screen` is `SINGLEPLAYER_SUBMENU`. Valid modes: `standard`, `daily`, `custom`. After selecting, the screen transitions to character select (for standard) or the corresponding mode screen.
+
+#### switch_profile
+
+```
+./sts2 switch_profile <profile_id>
+```
+
+Switches to one of the game's 3 fixed local save-profile slots (`profile_id` 1-3), via the main menu's profile screen — the same path the in-game "change profile" button uses. Only available when `screen` is `MENU`.
+
+Each profile is a fully independent save (deck/relic/run history, current run, progress); switching only loads the target profile's own data and never writes to the profile being switched away from. Primarily useful for testing: switch to an unused profile slot to get a disposable save to freely exercise commands on without touching a real profile, then `switch_profile` back when done. If `profile_id` is already the active profile, returns `{"profile_id": N, "already_active": true}` without opening the screen.
 
 ---
 
@@ -277,7 +356,9 @@ Buy the card removal service from the shop. Opens a grid card selection screen (
 ./sts2 reward_claim --type <type> [--id <id>] [--nth <n>]
 ```
 
-Claim a non-card reward. Types: `gold`, `potion`, `relic`, `special_card`. `--id` required for all except `gold`.
+Claim a non-card reward. Types: `gold`, `potion`, `relic`, `special_card`, `card_removal`. `--id` required for all except `gold` and `card_removal`.
+
+`card_removal` is the exception to the usual "claim and done" flow: it opens a card selection screen instead of claiming instantly. The response has `status: "selection_required"` and `next_action: "grid_select_card"` (plus an inline `grid_card_select` snapshot) — follow up with `grid_select_card <card_id>` to pick the card to remove, or `grid_select_skip` to cancel.
 
 #### reward_choose_card / reward_skip_card
 
@@ -428,7 +509,16 @@ data
 │                       # BUNDLE_SELECT | CRYSTAL_SPHERE
 │                       # GAME_OVER | UNKNOWN
 ├── timestamp           # Unix ms
+├── state_version       # int, monotonic; increments only when observable state changes
+├── is_busy             # bool, true while the game is mid-transition / resolving an action
 ├── error               # string?, error message if state extraction failed
+│
+├── player              # Populated on all in-run screens (null in menus / character select).
+│   │                   # Run-scoped: hp, max_hp, block, gold, deck_count, relics[], potions[],
+│   │                   # powers[], character_id, character_name, max_energy.
+│   └──                 # Combat-scoped fields (energy, hand/draw/discard/exhaust counts,
+│                       # orbs, stars, pets) are zero/null outside combat.
+│                       # During combat this equals combat.player.
 │
 ├── menu                      # Only when screen is MENU
 │   └── has_run_save        # bool, true if a saved run exists (continue_run available)
@@ -658,7 +748,7 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `UI_NOT_FOUND` | Required UI element not found |
 | `TIMEOUT` | Action did not complete within time limit |
 
-**Main Menu** (`continue_run`, `new_run`, `abandon_run`, `choose_game_mode`):
+**Main Menu** (`continue_run`, `new_run`, `abandon_run`, `choose_game_mode`, `switch_profile`):
 
 | Error | Cause |
 |-------|-------|
@@ -668,6 +758,7 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `NOT_ON_SINGLEPLAYER_SUBMENU` | Not on singleplayer submenu (choose_game_mode) |
 | `INVALID_GAME_MODE` | Mode not one of standard, daily, custom |
 | `MODE_NOT_UNLOCKED` | Game mode not yet unlocked |
+| `INVALID_PROFILE_ID` | Profile id not 1-3 (switch_profile) |
 | `BUTTON_NOT_FOUND` | UI button not found |
 | `BUTTON_DISABLED` | UI button is disabled |
 | `ACTION_FAILED` | Failed to execute menu action |
@@ -791,7 +882,6 @@ Cards can have the following keywords. These are returned as strings in the `key
 | `USE_CHOOSE_CARD` | Used `reward_claim` on card reward |
 | `CARD_NOT_FOUND` | Card ID not found in card reward |
 | `POTION_BELT_FULL` | No empty potion slots |
-| `NOT_SUPPORTED` | Unsupported reward type |
 | `CLAIM_FAILED` | Unknown failure |
 
 **Proceed** (`proceed`):

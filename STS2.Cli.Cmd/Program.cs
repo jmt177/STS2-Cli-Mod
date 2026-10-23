@@ -43,6 +43,8 @@ internal static class Program
         // Simple commands (no arguments)
         rootCommand.Subcommands.Add(SimpleCommand.Create("ping", "Test connection to the mod"));
         rootCommand.Subcommands.Add(StateCommand.Create());
+        rootCommand.Subcommands.Add(LegalActionsCommand.Create());
+        rootCommand.Subcommands.Add(ConsoleExecCommand.Create());
         rootCommand.Subcommands.Add(SimpleCommand.Create("view_deck",
             "View the master deck (available at any point during a run)"));
         rootCommand.Subcommands.Add(SimpleCommand.Create("end_turn", "End the current turn"));
@@ -137,6 +139,9 @@ internal static class Program
         rootCommand.Subcommands.Add(SimpleCommand.Create("abandon_run",
             "Abandon the current saved run from the main menu"));
         rootCommand.Subcommands.Add(ChooseGameModeCommand.Create());
+        rootCommand.Subcommands.Add(IndexedCommand.Create(
+            "switch_profile", "Switch to one of the game's 3 local save profiles (from the main menu)",
+            new Argument<int>("profile_id") { Description = "Profile id (1-3)" }));
 
         // Bug reporting command (local-only, no pipe required)
         rootCommand.Subcommands.Add(ReportBugCommand.Create());

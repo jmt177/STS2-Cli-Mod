@@ -107,17 +107,12 @@ public static class ProceedHandler
 
             // --- No valid context found ---
 
-            return new
-            {
-                ok = false,
-                error = "NO_PROCEED_AVAILABLE",
-                message = "Not on reward screen, event room, rest site, treasure room, or merchant room"
-            };
+            return Responses.Error("NO_PROCEED_AVAILABLE", "Not on reward screen, event room, rest site, treasure room, or merchant room");
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to proceed: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -131,12 +126,7 @@ public static class ProceedHandler
         if (proceedButton == null)
         {
             Logger.Warning("NProceedButton not found in NRewardsScreen");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_BUTTON_NOT_FOUND",
-                message = "Proceed button not found on reward screen"
-            };
+            return Responses.Error("PROCEED_BUTTON_NOT_FOUND", "Proceed button not found on reward screen");
         }
 
         if (!proceedButton.IsEnabled)
@@ -148,12 +138,7 @@ public static class ProceedHandler
                 : "Proceed button is not enabled";
 
             Logger.Warning($"NProceedButton is not enabled (skipDisallowed={skipDisallowed})");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_ENABLED",
-                message
-            };
+            return Responses.Error("PROCEED_NOT_ENABLED", message);
         }
 
         Logger.Info("Clicking proceed button on reward screen");
@@ -161,16 +146,12 @@ public static class ProceedHandler
 
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "reward_screen",
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "reward_screen",
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>
@@ -183,23 +164,13 @@ public static class ProceedHandler
     {
         var eventModel = EventUtils.GetEventModel(eventRoom);
         if (eventModel == null)
-            return new
-            {
-                ok = false,
-                error = "INTERNAL_ERROR",
-                message = "Failed to access event model"
-            };
+            return Responses.Error("INTERNAL_ERROR", "Failed to access event model");
 
         if (!eventModel.IsFinished)
         {
             var eventId = eventModel.Id.Entry;
             Logger.Warning($"Event '{eventId}' is not finished, cannot proceed");
-            return new
-            {
-                ok = false,
-                error = "EVENT_NOT_FINISHED",
-                message = $"Event '{eventId}' is not finished. Use 'choose_event' to select an option first."
-            };
+            return Responses.Error("EVENT_NOT_FINISHED", $"Event '{eventId}' is not finished. Use 'choose_event' to select an option first.");
         }
 
         Logger.Info("Event is finished, calling NEventRoom.Proceed()");
@@ -207,16 +178,12 @@ public static class ProceedHandler
 
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "event",
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "event",
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>
@@ -228,34 +195,19 @@ public static class ProceedHandler
         if (proceedButton == null)
         {
             Logger.Warning("NProceedButton not found in NFakeMerchant");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_BUTTON_NOT_FOUND",
-                message = "Proceed button not found on FakeMerchant event"
-            };
+            return Responses.Error("PROCEED_BUTTON_NOT_FOUND", "Proceed button not found on FakeMerchant event");
         }
 
         if (!proceedButton.Visible)
         {
             Logger.Warning("NProceedButton is not visible");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_VISIBLE",
-                message = "Proceed button is not visible"
-            };
+            return Responses.Error("PROCEED_NOT_VISIBLE", "Proceed button is not visible");
         }
 
         if (!proceedButton.IsEnabled)
         {
             Logger.Warning("NProceedButton is not enabled");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_ENABLED",
-                message = "Proceed button is not enabled (shop may be open)"
-            };
+            return Responses.Error("PROCEED_NOT_ENABLED", "Proceed button is not enabled (shop may be open)");
         }
 
         Logger.Info("Clicking proceed button on FakeMerchant event");
@@ -264,16 +216,12 @@ public static class ProceedHandler
         // Wait for the map to open (async — does not block the Godot main thread)
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "fake_merchant",
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "fake_merchant",
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>
@@ -288,12 +236,7 @@ public static class ProceedHandler
         if (!proceedButton.IsEnabled)
         {
             Logger.Warning("NProceedButton is not enabled (no option chosen yet?)");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_ENABLED",
-                message = "Proceed button is not enabled (choose a rest site option first)"
-            };
+            return Responses.Error("PROCEED_NOT_ENABLED", "Proceed button is not enabled (choose a rest site option first)");
         }
 
         Logger.Info("Clicking proceed button on rest site");
@@ -301,16 +244,12 @@ public static class ProceedHandler
 
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "rest_site",
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "rest_site",
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>
@@ -326,12 +265,7 @@ public static class ProceedHandler
         if (!proceedButton.IsEnabled)
         {
             Logger.Warning("NProceedButton is not enabled on treasure room");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_ENABLED",
-                message = "Proceed button is not enabled (open chest and pick/skip relic first)"
-            };
+            return Responses.Error("PROCEED_NOT_ENABLED", "Proceed button is not enabled (open chest and pick/skip relic first)");
         }
 
         // Mirrors OnProceedButtonPressed: if IsSkip, call SkipRelicLocally first
@@ -353,17 +287,13 @@ public static class ProceedHandler
 
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "treasure_room",
-                skipped_relic = isSkip,
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "treasure_room",
+            skipped_relic = isSkip,
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>
@@ -380,12 +310,7 @@ public static class ProceedHandler
         if (!proceedButton.IsEnabled)
         {
             Logger.Warning("NProceedButton is not enabled on merchant room (shop inventory may be open)");
-            return new
-            {
-                ok = false,
-                error = "PROCEED_NOT_ENABLED",
-                message = "Proceed button is not enabled (close shop inventory first)"
-            };
+            return Responses.Error("PROCEED_NOT_ENABLED", "Proceed button is not enabled (close shop inventory first)");
         }
 
         Logger.Info("Clicking proceed button on merchant room");
@@ -393,16 +318,12 @@ public static class ProceedHandler
 
         var proceeded = await WaitForMapOpenAsync();
 
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                context = "merchant_room",
-                proceeded,
-                action = "PROCEED"
-            }
-        };
+            context = "merchant_room",
+            proceeded,
+            action = "PROCEED"
+        });
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Combat;
@@ -9,6 +10,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Runs;
+using STS2.Cli.Mod.Actions.Utils;
 using STS2.Cli.Mod.Models.Messages;
 using STS2.Cli.Mod.Models.State;
 using STS2.Cli.Mod.State.Builders;
@@ -25,40 +27,71 @@ public static class StateHandler
     private static readonly ModLogger Logger = new("StateHandler");
 
     /// <summary>
+    ///     Default timeout (ms) for <c>state --wait</c> / <c>legal_actions --wait</c> when the caller
+    ///     does not specify one.
+    /// </summary>
+    internal const int DefaultWaitStableTimeoutMs = 10000;
+
+    // Monotonic state version tracking. Access is single-threaded: all state requests
+    // are serialized (one pipe connection at a time) and run on the Godot main thread.
+    private static long _stateVersion;
+    private static string? _lastStateSignature;
+
+    /// <summary>
     ///     Handles the state request.
     /// </summary>
     /// <param name="request">The parsed request object.</param>
     /// <returns>Response containing the game state DTO, or an error if extraction failed.</returns>
-    public static Task<object> HandleRequestAsync(Request request)
-    {
-        return Task.FromResult<object>(HandleRequestCore(request));
-    }
-
-    private static object HandleRequestCore(Request request)
+    public static async Task<object> HandleRequestAsync(Request request)
     {
         Logger.Info("Requested game state");
+
+        var settled = true;
+        if (request.WaitStable)
+        {
+            var timeoutMs = request.WaitTimeoutMs is > 0 ? request.WaitTimeoutMs.Value : DefaultWaitStableTimeoutMs;
+            settled = await ActionUtils.PollUntilAsync(() => !DetectIsBusy(DetectScreen()), timeoutMs);
+        }
 
         var state = GetState(request.IncludePileDetails);
 
         if (state.Error != null)
-            return new { ok = false, error = "STATE_EXTRACTION_ERROR", message = state.Error };
+            return Responses.Error("STATE_EXTRACTION_ERROR", state.Error);
 
-        return new { ok = true, data = state };
+        if (!settled)
+            return Responses.Ok(state, "Timed out waiting for the game to settle (is_busy is still true)");
+
+        return Responses.Ok(state);
     }
 
     /// <summary>
     ///     Gets the current game state.
     /// </summary>
     /// <param name="includePileDetails">Whether to include full card descriptions in pile listings.</param>
-    private static GameStateDto GetState(bool includePileDetails = false)
+    /// <remarks>Internal (not private) so <see cref="LegalActionsHandler" /> can build its own fresh snapshot.</remarks>
+    internal static GameStateDto GetState(bool includePileDetails = false)
     {
         try
         {
+            var screen = DetectScreen();
             var state = new GameStateDto
             {
-                Screen = DetectScreen(),
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                Screen = screen,
+                IsBusy = DetectIsBusy(screen)
             };
+
+            // Top-level player: available on every in-run screen, not just combat.
+            if (RunManager.Instance.IsInProgress)
+                try
+                {
+                    var runState = RunManager.Instance.DebugOnlyGetState();
+                    if (runState?.Players.Count > 0)
+                        state.Player = PlayerStateBuilder.Build(runState.Players[0]);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning($"Failed to build top-level player state: {ex.Message}");
+                }
 
             switch (state.Screen)
             {
@@ -68,6 +101,9 @@ public static class StateHandler
                     break;
                 case "SINGLEPLAYER_SUBMENU":
                     state.SingleplayerSubmenu = SingleplayerSubmenuStateBuilder.Build();
+                    break;
+                case "PROFILE_SCREEN":
+                    state.ProfileScreen = ProfileScreenStateBuilder.Build();
                     break;
                 case "MENU":
                     state.Menu = MenuStateBuilder.Build();
@@ -130,12 +166,86 @@ public static class StateHandler
                     break;
             }
 
+            // Bump the version only if the observable state changed since the last read.
+            // Computed before Timestamp is assigned so the timestamp does not perturb the diff.
+            state.StateVersion = ComputeStateVersion(state);
+            state.Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
             return state;
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to extract game state: {ex.Message}");
             return new GameStateDto { Screen = "ERROR", Error = ex.Message };
+        }
+    }
+
+    /// <summary>
+    ///     Computes the monotonic <see cref="GameStateDto.StateVersion" />.
+    ///     Serializes the full state DTO (Timestamp and StateVersion are still at their
+    ///     defaults at this point) and increments the counter only when the result differs
+    ///     from the previous read.
+    /// </summary>
+    private static long ComputeStateVersion(GameStateDto state)
+    {
+        try
+        {
+            var signature = JsonSerializer.Serialize(state, JsonOptions.Default);
+            if (signature != _lastStateSignature)
+            {
+                _lastStateSignature = signature;
+                _stateVersion++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Failed to compute state signature: {ex.Message}");
+        }
+
+        return _stateVersion;
+    }
+
+    /// <summary>
+    ///     Detects whether the game is mid-transition or still resolving a previous action,
+    ///     meaning the caller should wait before issuing another action.
+    ///     Conservative: only returns <c>true</c> for the cases we can detect reliably
+    ///     (room/loading transitions during a run, combat outside the play phase or with
+    ///     player actions disabled, and map travel animations). All click-driven screens
+    ///     — events, shop, rest, rewards, and card/relic/bundle selection overlays — report
+    ///     <c>false</c>; their handlers already wait for their own transitions.
+    /// </summary>
+    /// <param name="screen">The screen string from <see cref="DetectScreen" />.</param>
+    public static bool DetectIsBusy(string screen)
+    {
+        try
+        {
+            switch (screen)
+            {
+                case "MENU" or "SINGLEPLAYER_SUBMENU" or "CHARACTER_SELECT" or "PROFILE_SCREEN":
+                    return false;
+
+                // Between rooms / loading / fade transitions during an active run.
+                case "UNKNOWN":
+                    return RunManager.Instance.IsInProgress;
+
+                // Combat: the player may act only during the play phase with actions enabled.
+                case "COMBAT":
+                    return CombatManager.Instance.IsOverOrEnding
+                           || !ActionUtils.IsLocalPlayerInPlayPhase()
+                           || CombatManager.Instance.PlayerActionsDisabled;
+
+                // Map: a travel animation is in progress.
+                case "MAP":
+                    return NMapScreen.Instance is { IsOpen: true } && !NMapScreen.Instance.IsTravelEnabled;
+
+                default:
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Failed to determine busy state: {ex.Message}");
+            return false;
         }
     }
 
@@ -149,6 +259,7 @@ public static class StateHandler
         // --- Pre-run: main menu and its submenu stack ---
         if (UiUtils.FindCharacterSelectScreen() != null) return "CHARACTER_SELECT";
         if (UiUtils.FindSingleplayerSubmenu() != null) return "SINGLEPLAYER_SUBMENU";
+        if (UiUtils.FindProfileScreen() != null) return "PROFILE_SCREEN";
         if (UiUtils.FindMainMenu() != null) return "MENU";
 
         // All screens below require an active run

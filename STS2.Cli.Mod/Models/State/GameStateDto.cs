@@ -20,9 +20,34 @@ public class GameStateDto
     public long Timestamp { get; set; }
 
     /// <summary>
+    ///     Monotonic state version. Increments only when the observable game state changes
+    ///     between two <c>state</c> reads (it is not a frame counter — a settled game yields
+    ///     a stable value). Compare the value across two calls to detect whether anything
+    ///     changed after issuing an action.
+    /// </summary>
+    public long StateVersion { get; set; }
+
+    /// <summary>
+    ///     True when the game is mid-transition or still resolving a previous action
+    ///     (room/loading transitions, enemy turn or animations in combat, map travel animation).
+    ///     Callers should wait until this is <c>false</c> before issuing another action,
+    ///     or use <c>state --wait</c> to block until it clears.
+    /// </summary>
+    public bool IsBusy { get; set; }
+
+    /// <summary>
     ///     Error message if state extraction failed.
     /// </summary>
     public string? Error { get; set; }
+
+    /// <summary>
+    ///     Player state, populated on all in-run screens (MAP, EVENT, SHOP, REST_SITE,
+    ///     COMBAT, ...). Contains run-scoped data (HP, gold, relics, potions, deck count);
+    ///     combat-scoped fields (energy, hand/draw/discard/exhaust counts, orbs, stars, pets)
+    ///     are zero/null outside combat. Null in menus and character select (no active run).
+    ///     During combat this is identical to <see cref="CombatStateDto.Player" />.
+    /// </summary>
+    public PlayerStateDto? Player { get; set; }
 
     /// <summary>
     ///     Combat state if in combat, null otherwise.
@@ -116,4 +141,11 @@ public class GameStateDto
     ///     Contains information about available game modes (standard, daily, custom).
     /// </summary>
     public SingleplayerSubmenuStateDto? SingleplayerSubmenu { get; set; }
+
+    /// <summary>
+    ///     Profile screen state if the profile screen is open, null otherwise.
+    ///     Lets a caller switch between the game's 3 local save profiles (e.g. to drive a
+    ///     disposable profile for testing without touching the player's main profile).
+    /// </summary>
+    public ProfileScreenStateDto? ProfileScreen { get; set; }
 }

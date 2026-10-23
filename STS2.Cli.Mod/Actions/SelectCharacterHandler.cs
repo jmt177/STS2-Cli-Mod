@@ -35,7 +35,7 @@ public static class SelectCharacterHandler
         if (string.IsNullOrEmpty(request.Id))
         {
             Logger.Warning("select_character requested with no character ID");
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Character ID is required" };
+            return Responses.Error("MISSING_ARGUMENT", "Character ID is required");
         }
 
         var characterId = request.Id;
@@ -46,12 +46,7 @@ public static class SelectCharacterHandler
         if (screen == null)
         {
             Logger.Warning("SelectCharacter requested but not on character select screen");
-            return new
-            {
-                ok = false,
-                error = "NOT_IN_CHARACTER_SELECT",
-                message = "Not on character select screen"
-            };
+            return Responses.Error("NOT_IN_CHARACTER_SELECT", "Not on character select screen");
         }
 
         // Find the character button container
@@ -59,12 +54,7 @@ public static class SelectCharacterHandler
         if (buttonContainer == null)
         {
             Logger.Error("Character button container not found");
-            return new
-            {
-                ok = false,
-                error = "UI_NOT_FOUND",
-                message = "Character button container not found"
-            };
+            return Responses.Error("UI_NOT_FOUND", "Character button container not found");
         }
 
         // Find all character buttons
@@ -85,24 +75,14 @@ public static class SelectCharacterHandler
         if (targetBtn == null)
         {
             Logger.Warning($"Character '{characterId}' not found");
-            return new
-            {
-                ok = false,
-                error = "CHARACTER_NOT_FOUND",
-                message = $"Character '{characterId}' not found"
-            };
+            return Responses.Error("CHARACTER_NOT_FOUND", $"Character '{characterId}' not found");
         }
 
         // Check if the character is locked
         if (GetIsLocked(targetBtn))
         {
             Logger.Warning($"Character '{characterId}' is locked");
-            return new
-            {
-                ok = false,
-                error = "CHARACTER_LOCKED",
-                message = $"Character '{characterId}' is locked"
-            };
+            return Responses.Error("CHARACTER_LOCKED", $"Character '{characterId}' is locked");
         }
 
         // Call Select() which triggers the character selection via the delegate
@@ -110,11 +90,7 @@ public static class SelectCharacterHandler
         Logger.Info($"Selecting character: {characterId}");
         targetBtn.Select();
 
-        return new
-        {
-            ok = true,
-            data = new { character_id = characterId }
-        };
+        return Responses.Ok(new { character_id = characterId });
     }
 
     /// <summary>

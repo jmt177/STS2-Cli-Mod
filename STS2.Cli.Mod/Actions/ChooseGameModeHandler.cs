@@ -33,28 +33,17 @@ public static class ChooseGameModeHandler
         Logger.Info($"Requested to choose game mode: {mode}");
 
         if (string.IsNullOrEmpty(mode))
-            return new
-            {
-                ok = false, error = "MISSING_ARGUMENT", message = "Game mode is required (standard, daily, custom)"
-            };
+            return Responses.Error("MISSING_ARGUMENT", "Game mode is required (standard, daily, custom)");
 
         if (mode != "standard" && mode != "daily" && mode != "custom")
-            return new
-            {
-                ok = false, error = "INVALID_GAME_MODE",
-                message = $"Invalid game mode: {mode}. Valid modes: standard, daily, custom"
-            };
+            return Responses.Error("INVALID_GAME_MODE", $"Invalid game mode: {mode}. Valid modes: standard, daily, custom");
 
         // Guard: Must be on the SINGLEPLAYER_SUBMENU screen
         var currentScreen = StateHandler.DetectScreen();
         if (currentScreen != "SINGLEPLAYER_SUBMENU")
         {
             Logger.Warning($"Cannot choose game mode: not on singleplayer submenu (current: {currentScreen})");
-            return new
-            {
-                ok = false, error = "NOT_ON_SINGLEPLAYER_SUBMENU",
-                message = $"Not on singleplayer submenu screen (current: {currentScreen})"
-            };
+            return Responses.Error("NOT_ON_SINGLEPLAYER_SUBMENU", $"Not on singleplayer submenu screen (current: {currentScreen})");
         }
 
         try
@@ -64,7 +53,7 @@ public static class ChooseGameModeHandler
             if (submenu == null)
             {
                 Logger.Error("NSingleplayerSubmenu not found");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Singleplayer submenu not found" };
+                return Responses.Error("UI_NOT_FOUND", "Singleplayer submenu not found");
             }
 
             // Find the button for the requested mode
@@ -77,22 +66,19 @@ public static class ChooseGameModeHandler
             };
 
             if (buttonName == null)
-                return new { ok = false, error = "INVALID_GAME_MODE", message = $"Invalid game mode: {mode}" };
+                return Responses.Error("INVALID_GAME_MODE", $"Invalid game mode: {mode}");
 
             var button = submenu.GetNodeOrNull<NButton>(buttonName);
             if (button == null)
             {
                 Logger.Error($"Button not found: {buttonName}");
-                return new { ok = false, error = "BUTTON_NOT_FOUND", message = $"Button not found: {buttonName}" };
+                return Responses.Error("BUTTON_NOT_FOUND", $"Button not found: {buttonName}");
             }
 
             if (!button.IsEnabled)
             {
                 Logger.Warning($"Button is disabled: {buttonName} (game mode not unlocked)");
-                return new
-                {
-                    ok = false, error = "MODE_NOT_UNLOCKED", message = $"Game mode '{mode}' is not unlocked yet"
-                };
+                return Responses.Error("MODE_NOT_UNLOCKED", $"Game mode '{mode}' is not unlocked yet");
             }
 
             // Click the button via EmitSignal
@@ -108,21 +94,17 @@ public static class ChooseGameModeHandler
             if (!screenReady)
             {
                 Logger.Warning($"Timed out waiting for character select after choosing game mode '{mode}'");
-                return new
-                {
-                    ok = true,
-                    data = new { action = "CHOOSE_GAME_MODE", mode },
-                    warning = "Timed out waiting for character select screen"
-                };
+                return Responses.Ok(new { action = "CHOOSE_GAME_MODE", mode },
+                    "Timed out waiting for character select screen");
             }
 
             Logger.Info($"Game mode '{mode}' selected, character select screen ready");
-            return new { ok = true, data = new { action = "CHOOSE_GAME_MODE", mode, screen = "CHARACTER_SELECT" } };
+            return Responses.Ok(new { action = "CHOOSE_GAME_MODE", mode, screen = "CHARACTER_SELECT" });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to choose game mode: {ex.Message}");
-            return new { ok = false, error = "ACTION_FAILED", message = $"Failed to choose game mode: {ex.Message}" };
+            return Responses.Error("ACTION_FAILED", $"Failed to choose game mode: {ex.Message}");
         }
     }
 }

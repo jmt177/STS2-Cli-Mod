@@ -53,7 +53,7 @@ public static class GridSelectCardHandler
         if (request.CardIds == null || request.CardIds.Length == 0)
         {
             Logger.Warning("grid_select_card requested with no card IDs");
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "At least one card ID is required" };
+            return Responses.Error("MISSING_ARGUMENT", "At least one card ID is required");
         }
 
         Logger.Info($"Requested to select {request.CardIds.Length} card(s) from grid card selection screen");
@@ -66,43 +66,22 @@ public static class GridSelectCardHandler
             // Guard: Must be on a grid card selection screen
             var screen = FindGridSelectionScreen();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_GRID_CARD_SELECT",
-                    message = "Not on a grid card selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_GRID_CARD_SELECT", "Not on a grid card selection screen. Use 'sts2 state' to check current screen.");
 
             // Get prefs for validation
             var prefs = GetPrefs(screen);
             if (prefs == null)
-                return new
-                {
-                    ok = false,
-                    error = "INTERNAL_ERROR",
-                    message = "Failed to read selection preferences from screen."
-                };
+                return Responses.Error("INTERNAL_ERROR", "Failed to read selection preferences from screen.");
 
             // Validate selection count
             if (cardIds.Length < 1 || cardIds.Length > prefs.Value.MaxSelect)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_SELECTION_COUNT",
-                    message =
-                        $"This selection requires 1-{prefs.Value.MaxSelect} card(s), but {cardIds.Length} was provided."
-                };
+                return Responses.Error("INVALID_SELECTION_COUNT", $"This selection requires 1-{prefs.Value.MaxSelect} card(s), but {cardIds.Length} was provided.");
 
             // Get the card list and grid
             var cards = GetCards(screen);
             var grid = GetGrid(screen);
             if (cards == null || grid == null)
-                return new
-                {
-                    ok = false,
-                    error = "INTERNAL_ERROR",
-                    message = "Failed to access card grid or card list."
-                };
+                return Responses.Error("INTERNAL_ERROR", "Failed to access card grid or card list.");
 
             // Find and select each card
             var selectedCardIds = new List<string>();
@@ -126,12 +105,7 @@ public static class GridSelectCardHandler
                 // Find the holder in the grid using the CardModel reference
                 var holder = grid.GetCardHolder(cardModel);
                 if (holder == null)
-                    return new
-                    {
-                        ok = false,
-                        error = "CARD_NOT_FOUND",
-                        message = $"Card holder for '{cardId}' (nth={nth}) not found in grid."
-                    };
+                    return Responses.Error("CARD_NOT_FOUND", $"Card holder for '{cardId}' (nth={nth}) not found in grid.");
 
                 // Emit Pressed signal on the holder — triggers NCardGrid.OnHolderPressed → HolderPressed signal → OnCardClicked
                 Logger.Info($"Selecting card: {cardId} (nth={nth})");
@@ -212,21 +186,17 @@ public static class GridSelectCardHandler
 
             Logger.Info($"Successfully selected {selectedCardIds.Count} card(s)");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    selected_count = selectedCardIds.Count,
-                    selected_cards = selectedCardIds,
-                    message = $"Successfully selected {selectedCardIds.Count} card(s)"
-                }
-            };
+                selected_count = selectedCardIds.Count,
+                selected_cards = selectedCardIds,
+                message = $"Successfully selected {selectedCardIds.Count} card(s)"
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to select grid card: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -244,32 +214,17 @@ public static class GridSelectCardHandler
             // Guard: Must be on a grid card selection screen
             var screen = FindGridSelectionScreen();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_GRID_CARD_SELECT",
-                    message = "Not on a grid card selection screen."
-                };
+                return Responses.Error("NOT_IN_GRID_CARD_SELECT", "Not on a grid card selection screen.");
 
             // Check if cancelable
             var prefs = GetPrefs(screen);
             if (prefs is not { Cancelable: true })
-                return new
-                {
-                    ok = false,
-                    error = "CANNOT_SKIP",
-                    message = "This grid card selection cannot be cancelled/skipped."
-                };
+                return Responses.Error("CANNOT_SKIP", "This grid card selection cannot be cancelled/skipped.");
 
             // Find and click the close button
             var closeButton = GetCloseButton(screen);
             if (closeButton == null)
-                return new
-                {
-                    ok = false,
-                    error = "UI_NOT_FOUND",
-                    message = "Close button not found on grid card selection screen."
-                };
+                return Responses.Error("UI_NOT_FOUND", "Close button not found on grid card selection screen.");
 
             Logger.Info("Skipping grid card selection via close button");
             closeButton.ForceClick();
@@ -279,16 +234,12 @@ public static class GridSelectCardHandler
             if (!completed)
                 Logger.Warning("Skip completed but screen was not removed in time");
 
-            return new
-            {
-                ok = true,
-                data = new { skipped = true }
-            };
+            return Responses.Ok(new { skipped = true });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to skip grid card selection: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

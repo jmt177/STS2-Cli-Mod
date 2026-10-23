@@ -53,7 +53,7 @@ public static class HandSelectCardHandler
             }
 
             Logger.Warning("hand_select_card requested with no card IDs");
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "At least one card ID is required" };
+            return Responses.Error("MISSING_ARGUMENT", "At least one card ID is required");
         }
 
         Logger.Info($"Requested to select {request.CardIds.Length} card(s) from hand selection");
@@ -74,22 +74,12 @@ public static class HandSelectCardHandler
             // Guard: Must be in hand card selection mode
             var hand = NPlayerHand.Instance;
             if (hand is not { IsInCardSelection: true })
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_HAND_SELECT",
-                    message = "Not in hand card selection mode."
-                };
+                return Responses.Error("NOT_IN_HAND_SELECT", "Not in hand card selection mode.");
 
             // Find the confirm button
             var confirmButton = hand.GetNodeOrNull<NConfirmButton>("%SelectModeConfirmButton");
             if (confirmButton == null)
-                return new
-                {
-                    ok = false,
-                    error = "UI_NOT_FOUND",
-                    message = "Confirm button not found in hand selection."
-                };
+                return Responses.Error("UI_NOT_FOUND", "Confirm button not found in hand selection.");
 
             // Check if confirm is enabled (enough cards selected)
             // NClickableControl exposes a public IsEnabled property (backed by protected _isEnabled field)
@@ -98,13 +88,7 @@ public static class HandSelectCardHandler
                 var prefs = HandSelectStateBuilder.GetPrefs(hand);
                 var selectedCards = HandSelectStateBuilder.GetSelectedCards(hand);
                 var count = selectedCards?.Count ?? 0;
-                return new
-                {
-                    ok = false,
-                    error = "CANNOT_CONFIRM",
-                    message =
-                        $"Cannot confirm: {count} card(s) selected, but {prefs?.MinSelect ?? 0}-{prefs?.MaxSelect ?? 0} required."
-                };
+                return Responses.Error("CANNOT_CONFIRM", $"Cannot confirm: {count} card(s) selected, but {prefs?.MinSelect ?? 0}-{prefs?.MaxSelect ?? 0} required.");
             }
 
             // Click the confirm button — this calls OnSelectModeConfirmButtonPressed
@@ -122,20 +106,16 @@ public static class HandSelectCardHandler
 
             Logger.Info("Hand selection confirmed successfully");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    confirmed = true,
-                    message = "Hand selection confirmed."
-                }
-            };
+                confirmed = true,
+                message = "Hand selection confirmed."
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to confirm hand selection: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -149,22 +129,12 @@ public static class HandSelectCardHandler
             // Guard: Must be in hand card selection mode
             var hand = NPlayerHand.Instance;
             if (hand is not { IsInCardSelection: true })
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_HAND_SELECT",
-                    message = "Not in hand card selection mode. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_HAND_SELECT", "Not in hand card selection mode. Use 'sts2 state' to check current screen.");
 
             // Get prefs for validation
             var prefs = HandSelectStateBuilder.GetPrefs(hand);
             if (prefs == null)
-                return new
-                {
-                    ok = false,
-                    error = "INTERNAL_ERROR",
-                    message = "Failed to read selection preferences from hand."
-                };
+                return Responses.Error("INTERNAL_ERROR", "Failed to read selection preferences from hand.");
 
             // Get current selected count to validate total won't exceed max
             var currentSelected = HandSelectStateBuilder.GetSelectedCards(hand);
@@ -220,25 +190,21 @@ public static class HandSelectCardHandler
 
             Logger.Info($"Successfully selected {selectedCardIds.Count} card(s), still_selecting={stillSelecting}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    selected_count = selectedCardIds.Count,
-                    selected_cards = selectedCardIds,
-                    still_selecting = stillSelecting,
-                    message = stillSelecting
+                selected_count = selectedCardIds.Count,
+                selected_cards = selectedCardIds,
+                still_selecting = stillSelecting,
+                message = stillSelecting
                         ? $"Selected {selectedCardIds.Count} card(s). Selection still active — " +
                           "use 'hand_confirm_selection' to confirm or select more cards."
                         : $"Selected {selectedCardIds.Count} card(s). Selection auto-completed."
-                }
-            };
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to select hand card: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

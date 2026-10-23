@@ -42,10 +42,7 @@ public static class ContinueRunHandler
         if (currentScreen != "MENU")
         {
             Logger.Warning($"Cannot continue run: not on menu screen (current: {currentScreen})");
-            return new
-            {
-                ok = false, error = "NOT_ON_MENU", message = $"Not on main menu screen (current: {currentScreen})"
-            };
+            return Responses.Error("NOT_ON_MENU", $"Not on main menu screen (current: {currentScreen})");
         }
 
         // Guard: Must have a saved run
@@ -53,7 +50,7 @@ public static class ContinueRunHandler
         if (!saveManager.HasRunSave)
         {
             Logger.Warning("Cannot continue run: no saved run exists");
-            return new { ok = false, error = "NO_SAVED_RUN", message = "No saved run exists. Use new_run instead." };
+            return Responses.Error("NO_SAVED_RUN", "No saved run exists. Use new_run instead.");
         }
 
         try
@@ -63,7 +60,7 @@ public static class ContinueRunHandler
             if (mainMenu == null)
             {
                 Logger.Error("NMainMenu instance not found");
-                return new { ok = false, error = "UI_NOT_FOUND", message = "Main menu not found" };
+                return Responses.Error("UI_NOT_FOUND", "Main menu not found");
             }
 
             // Find the Continue button
@@ -71,13 +68,13 @@ public static class ContinueRunHandler
             if (continueButton == null)
             {
                 Logger.Error("Continue button not found");
-                return new { ok = false, error = "BUTTON_NOT_FOUND", message = "Continue button not found" };
+                return Responses.Error("BUTTON_NOT_FOUND", "Continue button not found");
             }
 
             if (!continueButton.IsEnabled)
             {
                 Logger.Warning("Continue button is disabled");
-                return new { ok = false, error = "BUTTON_DISABLED", message = "Continue button is disabled" };
+                return Responses.Error("BUTTON_DISABLED", "Continue button is disabled");
             }
 
             // Click the Continue button via EmitSignal
@@ -93,12 +90,7 @@ public static class ContinueRunHandler
             if (!runLoaded)
             {
                 Logger.Warning("Timed out waiting for run to load after continue_run");
-                return new
-                {
-                    ok = true,
-                    data = new { action = "CONTINUE_RUN" },
-                    warning = "Timed out waiting for run to load"
-                };
+                return Responses.Ok(new { action = "CONTINUE_RUN" }, "Timed out waiting for run to load");
             }
 
             // Run data is loaded, but the game screen may not be ready yet.
@@ -115,21 +107,17 @@ public static class ContinueRunHandler
             if (!screenReady)
             {
                 Logger.Warning($"Timed out waiting for game screen after continue_run (current: {screen})");
-                return new
-                {
-                    ok = true,
-                    data = new { action = "CONTINUE_RUN", screen },
-                    warning = "Timed out waiting for game screen to appear"
-                };
+                return Responses.Ok(new { action = "CONTINUE_RUN", screen },
+                    "Timed out waiting for game screen to appear");
             }
 
             Logger.Info($"Run loaded successfully, landed on {screen} screen");
-            return new { ok = true, data = new { action = "CONTINUE_RUN", screen } };
+            return Responses.Ok(new { action = "CONTINUE_RUN", screen });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to continue run: {ex.Message}");
-            return new { ok = false, error = "ACTION_FAILED", message = $"Failed to continue run: {ex.Message}" };
+            return Responses.Error("ACTION_FAILED", $"Failed to continue run: {ex.Message}");
         }
     }
 }

@@ -46,7 +46,7 @@ public static class TriSelectCardHandler
         if (request.CardIds == null || request.CardIds.Length == 0)
         {
             Logger.Warning("tri_select_card requested with no card IDs");
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "At least one card ID is required" };
+            return Responses.Error("MISSING_ARGUMENT", "At least one card ID is required");
         }
 
         var cardIds = request.CardIds;
@@ -59,24 +59,14 @@ public static class TriSelectCardHandler
             // Guard: Must be in the TRI_SELECT screen
             var selectionScreen = UiUtils.FindScreenInOverlay<NChooseACardSelectionScreen>();
             if (selectionScreen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_TRI_SELECT",
-                    message = "Not in tri-select card selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_TRI_SELECT", "Not in tri-select card selection screen. Use 'sts2 state' to check current screen.");
 
             // Validate selection count (tri-select always picks exactly 1 card)
             var canSkip = ReadCanSkip(selectionScreen);
             if (cardIds.Length > 1 || (!canSkip && cardIds.Length < 1))
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_SELECTION_COUNT",
-                    message = canSkip
-                        ? $"This screen allows selecting 0-1 card(s), but {cardIds.Length} were provided."
-                        : $"This screen requires selecting exactly 1 card, but {cardIds.Length} were provided."
-                };
+                return Responses.Error("INVALID_SELECTION_COUNT", canSkip
+                    ? $"This screen allows selecting 0-1 card(s), but {cardIds.Length} were provided."
+                    : $"This screen requires selecting exactly 1 card, but {cardIds.Length} were provided.");
 
             // Validate no duplicates
             var uniqueIds = new HashSet<string>();
@@ -85,12 +75,7 @@ public static class TriSelectCardHandler
                 var nthVal = nthValues != null && i < nthValues.Length ? nthValues[i] : 0;
                 var key = $"{cardIds[i]}_{nthVal}";
                 if (!uniqueIds.Add(key))
-                    return new
-                    {
-                        ok = false,
-                        error = "DUPLICATE_SELECTION",
-                        message = $"Card '{cardIds[i]}' (nth={nthVal}) was selected multiple times."
-                    };
+                    return Responses.Error("DUPLICATE_SELECTION", $"Card '{cardIds[i]}' (nth={nthVal}) was selected multiple times.");
             }
 
             // Find and select each card by ID
@@ -103,12 +88,7 @@ public static class TriSelectCardHandler
 
                 var holder = FindCardHolderById(selectionScreen, cardId, nth);
                 if (holder == null)
-                    return new
-                    {
-                        ok = false,
-                        error = "CARD_NOT_FOUND",
-                        message = $"Card '{cardId}' (nth={nth}) not found in selection screen."
-                    };
+                    return Responses.Error("CARD_NOT_FOUND", $"Card '{cardId}' (nth={nth}) not found in selection screen.");
 
                 // Emit click signal
                 Logger.Info($"Selecting card: {cardId} (nth={nth})");
@@ -130,21 +110,17 @@ public static class TriSelectCardHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"Tri-select completed, selected {selectedCardIds.Count} card(s), now on {screen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    selected_count = selectedCardIds.Count,
-                    selected_cards = selectedCardIds,
-                    screen
-                }
-            };
+                selected_count = selectedCardIds.Count,
+                selected_cards = selectedCardIds,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to select card from tri-select: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -163,33 +139,18 @@ public static class TriSelectCardHandler
             // Guard: Must be in the TRI_SELECT screen
             var selectionScreen = UiUtils.FindScreenInOverlay<NChooseACardSelectionScreen>();
             if (selectionScreen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_TRI_SELECT",
-                    message = "Not in tri-select card selection screen."
-                };
+                return Responses.Error("NOT_IN_TRI_SELECT", "Not in tri-select card selection screen.");
 
             // Infer constraints to check if skip is allowed
             var canSkip = ReadCanSkip(selectionScreen);
 
             if (!canSkip)
-                return new
-                {
-                    ok = false,
-                    error = "CANNOT_SKIP",
-                    message = "This selection cannot be skipped. You must select a card."
-                };
+                return Responses.Error("CANNOT_SKIP", "This selection cannot be skipped. You must select a card.");
 
             // Find and click the skip button
             var skipButton = FindSkipButton(selectionScreen);
             if (skipButton == null)
-                return new
-                {
-                    ok = false,
-                    error = "SKIP_BUTTON_NOT_FOUND",
-                    message = "Skip button not found in selection screen."
-                };
+                return Responses.Error("SKIP_BUTTON_NOT_FOUND", "Skip button not found in selection screen.");
 
             Logger.Info("Skipping tri-select card selection");
             skipButton.ForceClick();
@@ -204,16 +165,12 @@ public static class TriSelectCardHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"Tri-select skip completed, now on {screen}");
 
-            return new
-            {
-                ok = true,
-                data = new { skipped = true, screen }
-            };
+            return Responses.Ok(new { skipped = true, screen });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to skip tri-select: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 

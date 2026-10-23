@@ -13,7 +13,9 @@ AI Agent ──> sts2 CLI ──Named Pipe──> In-Game Mod ──> Game
 
 ## Features
 
-- **Full game state extraction** — Query the complete game state as structured JSON: combat (hand, enemies, intents, powers, draw/discard/exhaust piles), map, events, shop, rewards, rest sites, and more.
+- **Full game state extraction** — Query the complete game state as structured JSON: combat (hand, enemies, intents, powers, draw/discard/exhaust piles), map, events, shop, rewards, rest sites, and more. A top-level `player` block (HP, gold, relics, potions, deck) is present on every in-run screen.
+- **State synchronization** — Every `state` response carries `state_version` (monotonic, changes only when observable state changes) and `is_busy` (true while the game is mid-transition). `state --wait` blocks until the game settles, so an automated loop never acts on a half-updated world.
+- **Legal action discovery** — `legal_actions` enumerates every legal action for the current screen (playable cards with targeting info, travelable map nodes, affordable shop items, selectable rewards, and more) as ready-to-use `{command, id, args, ...}` entries, so an AI agent never has to infer legality by hand from raw state.
 - **Action execution** — Play cards, use potions, end turns, navigate the map, pick rewards, buy from shops, choose event options, and handle every game screen.
 - **16+ screen types detected** — Combat, Map, Event, Shop, Reward, Rest Site, Treasure, Character Select, Crystal Sphere mini-game, and others.
 - **40+ commands** — Covering the full game flow from main menu to game over.
@@ -128,7 +130,8 @@ For the full command reference with detailed parameters and response formats, se
 | Command | Description |
 |---------|-------------|
 | `ping` | Test connection to the mod |
-| `state` | Get current game state as JSON |
+| `state` | Get current game state as JSON. `--wait` blocks until the game is no longer busy (`is_busy=false`) before returning |
+| `legal_actions` | List every legal action for the current screen as `{command, id, args, ...}` entries. Same `--wait` support as `state` |
 
 ### Main Menu
 
@@ -138,6 +141,7 @@ For the full command reference with detailed parameters and response formats, se
 | `continue_run` | Continue a saved run |
 | `abandon_run` | Abandon the saved run |
 | `choose_game_mode <mode>` | Select game mode (standard, daily, custom) |
+| `switch_profile <profile_id>` | Switch to one of the game's 3 local save profiles (1-3) |
 
 ### Character Select
 

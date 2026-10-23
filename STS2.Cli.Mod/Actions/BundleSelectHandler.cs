@@ -36,7 +36,7 @@ public static class BundleSelectHandler
     public static async Task<object> HandleSelectAsync(Request request)
     {
         if (request.Args == null || request.Args.Length < 1)
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Bundle index required (0-based)" };
+            return Responses.Error("MISSING_ARGUMENT", "Bundle index required (0-based)");
 
         var bundleIndex = request.Args[0];
         Logger.Info($"Requested to select bundle at index {bundleIndex}");
@@ -75,41 +75,21 @@ public static class BundleSelectHandler
             // --- Guard: Check bundle selection screen ---
             var screen = UiUtils.FindScreenInOverlay<NChooseABundleSelectionScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_BUNDLE_SELECT",
-                    message = "Not in bundle selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_BUNDLE_SELECT", "Not in bundle selection screen. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Check if preview is already showing ---
             var previewContainer = screen.GetNodeOrNull<Control>("%BundlePreviewContainer");
             if (previewContainer?.Visible == true)
-                return new
-                {
-                    ok = false,
-                    error = "PREVIEW_ALREADY_OPEN",
-                    message = "A bundle preview is already open. Use 'bundle_confirm' or 'bundle_cancel' first."
-                };
+                return Responses.Error("PREVIEW_ALREADY_OPEN", "A bundle preview is already open. Use 'bundle_confirm' or 'bundle_cancel' first.");
 
             // --- Guard: Find bundles ---
             var bundles = UiUtils.FindAll<NCardBundle>(screen);
             if (bundles.Count == 0)
-                return new
-                {
-                    ok = false,
-                    error = "NO_BUNDLES_AVAILABLE",
-                    message = "No bundles available in the selection screen"
-                };
+                return Responses.Error("NO_BUNDLES_AVAILABLE", "No bundles available in the selection screen");
 
             // --- Guard: Check bundle index ---
             if (bundleIndex < 0 || bundleIndex >= bundles.Count)
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_BUNDLE_INDEX",
-                    message = $"Bundle index {bundleIndex} is out of range (0-{bundles.Count - 1})"
-                };
+                return Responses.Error("INVALID_BUNDLE_INDEX", $"Bundle index {bundleIndex} is out of range (0-{bundles.Count - 1})");
 
             // --- Click the bundle hitbox to open preview ---
             var bundle = bundles[bundleIndex];
@@ -121,21 +101,17 @@ public static class BundleSelectHandler
 
             // --- Return result ---
             var resultScreen = StateHandler.DetectScreen();
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "BUNDLE_SELECT",
-                    bundle_index = bundleIndex,
-                    screen = resultScreen
-                }
-            };
+                action = "BUNDLE_SELECT",
+                bundle_index = bundleIndex,
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to select bundle: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -150,22 +126,12 @@ public static class BundleSelectHandler
             // --- Guard: Check bundle selection screen ---
             var screen = UiUtils.FindScreenInOverlay<NChooseABundleSelectionScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_BUNDLE_SELECT",
-                    message = "Not in bundle selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_BUNDLE_SELECT", "Not in bundle selection screen. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Find and check confirm button ---
             var confirmButton = screen.GetNodeOrNull<NConfirmButton>("%Confirm");
             if (confirmButton is not { IsEnabled: true })
-                return new
-                {
-                    ok = false,
-                    error = "CANNOT_CONFIRM",
-                    message = "Confirm button is not enabled. Preview a bundle first with 'bundle_select <index>'."
-                };
+                return Responses.Error("CANNOT_CONFIRM", "Confirm button is not enabled. Preview a bundle first with 'bundle_select <index>'.");
 
             // --- Click confirm ---
             Logger.Info("Clicking confirm button");
@@ -182,20 +148,16 @@ public static class BundleSelectHandler
             var resultScreen = StateHandler.DetectScreen();
             Logger.Info($"After confirming bundle, detected screen: {resultScreen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "BUNDLE_CONFIRM",
-                    screen = resultScreen
-                }
-            };
+                action = "BUNDLE_CONFIRM",
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to confirm bundle selection: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -210,22 +172,12 @@ public static class BundleSelectHandler
             // --- Guard: Check bundle selection screen ---
             var screen = UiUtils.FindScreenInOverlay<NChooseABundleSelectionScreen>();
             if (screen == null)
-                return new
-                {
-                    ok = false,
-                    error = "NOT_IN_BUNDLE_SELECT",
-                    message = "Not in bundle selection screen. Use 'sts2 state' to check current screen."
-                };
+                return Responses.Error("NOT_IN_BUNDLE_SELECT", "Not in bundle selection screen. Use 'sts2 state' to check current screen.");
 
             // --- Guard: Find and check cancel button ---
             var cancelButton = screen.GetNodeOrNull<NBackButton>("%Cancel");
             if (cancelButton is not { IsEnabled: true })
-                return new
-                {
-                    ok = false,
-                    error = "CANNOT_CANCEL",
-                    message = "Cancel button is not enabled. No bundle preview is currently open."
-                };
+                return Responses.Error("CANNOT_CANCEL", "Cancel button is not enabled. No bundle preview is currently open.");
 
             // --- Click cancel ---
             Logger.Info("Clicking cancel button");
@@ -238,20 +190,16 @@ public static class BundleSelectHandler
             var resultScreen = StateHandler.DetectScreen();
             Logger.Info($"After cancelling bundle preview, detected screen: {resultScreen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "BUNDLE_CANCEL",
-                    screen = resultScreen
-                }
-            };
+                action = "BUNDLE_CANCEL",
+                screen = resultScreen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to cancel bundle preview: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 }

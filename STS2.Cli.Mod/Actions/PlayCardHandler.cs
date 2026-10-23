@@ -37,7 +37,7 @@ public static class PlayCardHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.Id))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Card ID required (e.g., STRIKE_IRONCLAD)" };
+            return Responses.Error("MISSING_ARGUMENT", "Card ID required (e.g., STRIKE_IRONCLAD)");
 
         var cardId = request.Id;
         var nth = request.Nth ?? 0;
@@ -55,10 +55,10 @@ public static class PlayCardHandler
 
             var player = ActionUtils.GetLocalPlayer();
             if (player?.PlayerCombatState == null)
-                return new { ok = false, error = "NO_PLAYER", message = "Player not found or not in combat" };
+                return Responses.Error("NO_PLAYER", "Player not found or not in combat");
 
             if (!player.Creature.IsAlive)
-                return new { ok = false, error = "PLAYER_DEAD", message = "Player is dead - cannot play cards" };
+                return Responses.Error("PLAYER_DEAD", "Player is dead - cannot play cards");
 
             var hand = player.PlayerCombatState.Hand;
 
@@ -68,10 +68,7 @@ public static class PlayCardHandler
                 return findError;
 
             if (!card.CanPlay(out var reason, out _))
-                return new
-                {
-                    ok = false, error = "CANNOT_PLAY_CARD", message = $"Card '{card.Title}' cannot be played: {reason}"
-                };
+                return Responses.Error("CANNOT_PLAY_CARD", $"Card '{card.Title}' cannot be played: {reason}");
 
             // Resolve target
             var (target, targetError) = ActionUtils.ResolveTarget(
@@ -136,17 +133,13 @@ public static class PlayCardHandler
             if (finalState == null)
             {
                 Logger.Warning("PlayCardAction timed out waiting for completion");
-                return new { ok = false, error = "TIMEOUT", message = "Card action did not complete in time" };
+                return Responses.Error("TIMEOUT", "Card action did not complete in time");
             }
 
             if (finalState == GameActionState.Canceled)
             {
                 Logger.Info("PlayCardAction was cancelled by the game");
-                return new
-                {
-                    ok = false, error = "ACTION_CANCELLED",
-                    message = $"Card '{card.Title}' action was cancelled by the game"
-                };
+                return Responses.Error("ACTION_CANCELLED", $"Card '{card.Title}' action was cancelled by the game");
             }
 
             // --- Collect results from CombatHistory ---
@@ -154,22 +147,18 @@ public static class PlayCardHandler
             var results = CombatHistoryUtils.BuildFromHistory(historyBefore);
             Logger.Info($"PlayCardAction completed with {results.Count} result entries");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    card_index = cardIndex,
-                    card_id = card.Id.Entry,
-                    target = targetCombatId,
-                    results
-                }
-            };
+                card_index = cardIndex,
+                card_id = card.Id.Entry,
+                target = targetCombatId,
+                results
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to play card: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -195,24 +184,13 @@ public static class PlayCardHandler
             var availableStr = string.Join(", ", availableIds);
             Logger.Warning($"Card '{cardId}' not found in hand. Available: {availableStr}");
 
-            return (null!, 0, new
-            {
-                ok = false,
-                error = "CARD_NOT_FOUND",
-                message = $"Card '{cardId}' not found in hand. Available cards: {availableStr}"
-            });
+            return (null!, 0, Responses.Error("CARD_NOT_FOUND", $"Card '{cardId}' not found in hand. Available cards: {availableStr}"));
         }
 
         if (nth < 0 || nth >= matchingCards.Count)
         {
             Logger.Warning($"Card '{cardId}' has {matchingCards.Count} copies, but nth={nth} was requested");
-            return (null!, 0, new
-            {
-                ok = false,
-                error = "INVALID_CARD_INDEX",
-                message =
-                    $"Card '{cardId}' has {matchingCards.Count} copies in hand. Use nth from 0 to {matchingCards.Count - 1}."
-            });
+            return (null!, 0, Responses.Error("INVALID_CARD_INDEX", $"Card '{cardId}' has {matchingCards.Count} copies in hand. Use nth from 0 to {matchingCards.Count - 1}."));
         }
 
         var selected = matchingCards[nth];
@@ -231,19 +209,15 @@ public static class PlayCardHandler
     private static object BuildHandSelectResponse(CardModel card, int cardIndex, int? targetCombatId)
     {
         var handState = HandSelectStateBuilder.Build();
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "hand_select_card",
-                card_index = cardIndex,
-                card_id = card.Id.Entry,
-                target = targetCombatId,
-                hand_select = handState
-            }
-        };
+            status = "selection_required",
+            next_action = "hand_select_card",
+            card_index = cardIndex,
+            card_id = card.Id.Entry,
+            target = targetCombatId,
+            hand_select = handState
+        });
     }
 
     /// <summary>
@@ -256,19 +230,15 @@ public static class PlayCardHandler
         CardModel card, int cardIndex, int? targetCombatId, NCardGridSelectionScreen gridScreen)
     {
         var gridState = GridCardSelectStateBuilder.Build(gridScreen);
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "grid_select_card",
-                card_index = cardIndex,
-                card_id = card.Id.Entry,
-                target = targetCombatId,
-                grid_card_select = gridState
-            }
-        };
+            status = "selection_required",
+            next_action = "grid_select_card",
+            card_index = cardIndex,
+            card_id = card.Id.Entry,
+            target = targetCombatId,
+            grid_card_select = gridState
+        });
     }
 
     /// <summary>
@@ -281,18 +251,14 @@ public static class PlayCardHandler
         CardModel card, int cardIndex, int? targetCombatId, NChooseACardSelectionScreen selectionScreen)
     {
         var triState = TriSelectStateBuilder.Build(selectionScreen);
-        return new
+        return Responses.Ok(new
         {
-            ok = true,
-            data = new
-            {
-                status = "selection_required",
-                next_action = "tri_select_card",
-                card_index = cardIndex,
-                card_id = card.Id.Entry,
-                target = targetCombatId,
-                tri_select = triState
-            }
-        };
+            status = "selection_required",
+            next_action = "tri_select_card",
+            card_index = cardIndex,
+            card_id = card.Id.Entry,
+            target = targetCombatId,
+            tri_select = triState
+        });
     }
 }

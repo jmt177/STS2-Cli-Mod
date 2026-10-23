@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
+using MegaCrit.Sts2.Core.Nodes.Screens.ProfileScreen;
 
 namespace STS2.Cli.Mod.Utils;
 
@@ -149,6 +150,29 @@ public static class UiUtils
         catch (Exception ex)
         {
             Logger.Warning($"Failed to find character select screen: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Finds the <see cref="NProfileScreen" /> if it is currently at the top of
+    ///     the main menu's submenu stack (opened via <c>NMainMenu.OpenProfileScreen</c>).
+    /// </summary>
+    /// <returns>
+    ///     The profile screen, or <c>null</c> if no submenu is open or the top submenu
+    ///     is not <see cref="NProfileScreen" />.
+    /// </returns>
+    public static NProfileScreen? FindProfileScreen()
+    {
+        try
+        {
+            var submenuStack = FindMainMenu()?.SubmenuStack;
+            if (submenuStack is not { SubmenusOpen: true }) return null;
+            return submenuStack.Peek() as NProfileScreen;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Failed to find profile screen: {ex.Message}");
             return null;
         }
     }

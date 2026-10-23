@@ -3,18 +3,24 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Rewards;
 using MegaCrit.Sts2.Core.Nodes.Screens;
+using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
+using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Rewards;
 using STS2.Cli.Mod.Actions.Utils;
 using STS2.Cli.Mod.Models.Messages;
+using STS2.Cli.Mod.State;
+using STS2.Cli.Mod.State.Builders;
 using STS2.Cli.Mod.Utils;
 
 namespace STS2.Cli.Mod.Actions;
 
 /// <summary>
 ///     Handles the <c>reward_claim</c> CLI command.
-///     Claims a non-card reward (gold, potion, relic, special card) by type + ID.
+///     Claims a non-card reward (gold, potion, relic, special card, card removal) by type + ID.
 ///     Uses <see cref="NClickableControl.ForceClick" /> on the <see cref="NRewardButton" />
 ///     to trigger the full game UI flow: claim animation, signal emission, and button removal.
+///     Card removal rewards are the exception — they open a card selection screen instead of
+///     claiming instantly, so they're handled by <see cref="ExecuteCardRemovalClaimAsync" />.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -33,7 +39,7 @@ public static class RewardClaimHandler
     public static async Task<object> ExecuteAsync(Request request)
     {
         if (string.IsNullOrEmpty(request.RewardType))
-            return new { ok = false, error = "MISSING_ARGUMENT", message = "Reward type required (--type)" };
+            return Responses.Error("MISSING_ARGUMENT", "Reward type required (--type)");
 
         var nthValue = request.Nth ?? 0;
         Logger.Info($"Requested to claim reward: type={request.RewardType}, id={request.Id ?? "null"}, nth={nthValue}");
@@ -48,7 +54,7 @@ public static class RewardClaimHandler
 
             var screen = UiUtils.FindScreenInOverlay<NRewardsScreen>();
             if (screen == null)
-                return new { ok = false, error = "NOT_ON_REWARD_SCREEN", message = "Reward screen is not active" };
+                return Responses.Error("NOT_ON_REWARD_SCREEN", "Reward screen is not active");
 
             var rewardButtons = UiUtils.FindRewardButtons(screen);
 
@@ -73,44 +79,26 @@ public static class RewardClaimHandler
 
             // If only one matching reward, nth must be 0
             if (matchingRewards.Count == 1 && nth != 0)
-                return new
-                {
-                    ok = false,
-                    error = "AMBIGUOUS_REWARD",
-                    message =
-                        $"Only one {rewardType} reward available, but nth={nth} was specified. Use nth=0 or omit --nth."
-                };
+                return Responses.Error("AMBIGUOUS_REWARD", $"Only one {rewardType} reward available, but nth={nth} was specified. Use nth=0 or omit --nth.");
 
             // If multiple matching rewards, nth is required to be specified (or defaults to 0)
             if (nth < 0 || nth >= matchingRewards.Count)
             {
                 var idPart = itemId != null ? $" with ID '{itemId}'" : "";
-                return new
-                {
-                    ok = false,
-                    error = "INVALID_REWARD_INDEX",
-                    message =
-                        $"{rewardType}{idPart} has {matchingRewards.Count} copies. Use nth from 0 to {matchingRewards.Count - 1}."
-                };
+                return Responses.Error("INVALID_REWARD_INDEX", $"{rewardType}{idPart} has {matchingRewards.Count} copies. Use nth from 0 to {matchingRewards.Count - 1}.");
             }
 
             var (rewardButton, reward) = matchingRewards[nth];
 
             // Card rewards must use choose_card / skip_card commands
             if (reward is CardReward)
-                return new
-                {
-                    ok = false, error = "USE_CHOOSE_CARD",
-                    message = "Card rewards must be claimed with choose_card or skipped with skip_card"
-                };
+                return Responses.Error("USE_CHOOSE_CARD", "Card rewards must be claimed with choose_card or skipped with skip_card");
 
-            // CardRemovalReward not supported yet
+            // CardRemovalReward opens a card selection screen (like shop_remove_card) instead of
+            // claiming instantly, so it needs its own flow rather than the simple ForceClick-and-wait
+            // path below (the reward button is not removed from the tree until a card is picked).
             if (reward is CardRemovalReward)
-                return new
-                {
-                    ok = false, error = "NOT_SUPPORTED",
-                    message = "Card removal reward is not yet supported"
-                };
+                return await ExecuteCardRemovalClaimAsync(rewardButton);
 
             // --- Claim the reward via ForceClick ---
 
@@ -125,33 +113,25 @@ public static class RewardClaimHandler
             {
                 // Button still presents — claim likely failed (e.g., potion belt full)
                 if (reward is PotionReward)
-                    return new
-                    {
-                        ok = false, error = "POTION_BELT_FULL",
-                        message = "Cannot claim potion — potion belt is full"
-                    };
+                    return Responses.Error("POTION_BELT_FULL", "Cannot claim potion — potion belt is full");
 
-                return new { ok = false, error = "CLAIM_FAILED", message = "Reward claim was not successful" };
+                return Responses.Error("CLAIM_FAILED", "Reward claim was not successful");
             }
 
             Logger.Info($"Reward claimed successfully: {rewardTypeName}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    reward_type = rewardType,
-                    item_id = itemId,
-                    nth,
-                    claimed = true
-                }
-            };
+                reward_type = rewardType,
+                item_id = itemId,
+                nth,
+                claimed = true
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to claim reward: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
@@ -179,6 +159,7 @@ public static class RewardClaimHandler
                 "special_card" => reward is SpecialCardReward scr &&
                                   (itemId == null ||
                                    MatchesId(UiUtils.GetPrivateField<CardModel>(scr, "_card")?.Id.Entry, itemId)),
+                "card_removal" => reward is CardRemovalReward,
                 _ => false
             };
 
@@ -223,6 +204,44 @@ public static class RewardClaimHandler
             Logger.Warning($"Timed out waiting for reward button removal after {ActionUtils.UiTimeoutMs}ms");
 
         return removed;
+    }
+
+    /// <summary>
+    ///     Claims a <see cref="CardRemovalReward" />. Unlike the other reward types, claiming this
+    ///     one calls <c>CardSelectCmd.FromDeckForRemoval</c> internally (via
+    ///     <c>RewardSynchronizer.DoUnsyncedCardRemoval</c>), which opens a card selection screen
+    ///     (<see cref="NCardGridSelectionScreen" />) and blocks until the player picks a card to
+    ///     remove — the reward button is not removed from the tree, and no RewardClaimed signal
+    ///     fires, until that selection completes. So instead of waiting for button removal like
+    ///     every other reward type, this polls for the selection screen to appear and hands off to
+    ///     <c>grid_select_card</c> / <c>grid_select_skip</c>, mirroring <c>shop_remove_card</c>.
+    /// </summary>
+    private static async Task<object> ExecuteCardRemovalClaimAsync(NRewardButton rewardButton)
+    {
+        Logger.Info("Claiming CardRemoval reward via ForceClick");
+        rewardButton.ForceClick();
+
+        var appeared = await ActionUtils.PollUntilAsync(
+            () => NOverlayStack.Instance?.Peek() is NCardGridSelectionScreen,
+            ActionUtils.UiTimeoutMs);
+
+        if (!appeared)
+        {
+            Logger.Warning("Timed out waiting for card removal selection screen to appear");
+            return Responses.Error("TIMEOUT", "Card removal selection screen did not appear in time");
+        }
+
+        var screen = StateHandler.DetectScreen();
+        Logger.Info($"Card removal reward opened card selection, detected screen: {screen}");
+
+        return Responses.Ok(new
+        {
+            status = "selection_required",
+            next_action = "grid_select_card",
+            reward_type = "card_removal",
+            screen,
+            grid_card_select = GridCardSelectStateBuilder.Build()
+        });
     }
 
     /// <summary>

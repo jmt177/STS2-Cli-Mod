@@ -42,32 +42,22 @@ public static class ShopRemoveCardHandler
             // --- Guard: Check merchant room ---
             var merchantRoom = NMerchantRoom.Instance;
             if (merchantRoom == null || !merchantRoom.IsInsideTree())
-                return new { ok = false, error = "NOT_IN_SHOP", message = "Not currently in a shop" };
+                return Responses.Error("NOT_IN_SHOP", "Not currently in a shop");
 
-            var inventory = merchantRoom.Room.Inventory;
+            var inventory = merchantRoom.Room.GetLocalInventory();
 
             // --- Guard: Check card removal entry exists ---
             var entry = inventory.CardRemovalEntry;
             if (entry == null)
-                return new
-                {
-                    ok = false, error = "NOT_IN_SHOP", message = "Card removal service not available in this shop"
-                };
+                return Responses.Error("NOT_IN_SHOP", "Card removal service not available in this shop");
 
             // --- Guard: Check not already used ---
             if (entry.Used)
-                return new
-                {
-                    ok = false, error = "CARD_REMOVAL_USED", message = "Card removal service has already been used"
-                };
+                return Responses.Error("CARD_REMOVAL_USED", "Card removal service has already been used");
 
             // --- Guard: Check enough gold ---
             if (!entry.EnoughGold)
-                return new
-                {
-                    ok = false, error = "NOT_ENOUGH_GOLD",
-                    message = $"Not enough gold for card removal (cost={entry.Cost})"
-                };
+                return Responses.Error("NOT_ENOUGH_GOLD", $"Not enough gold for card removal (cost={entry.Cost})");
 
             // --- Fire-and-forget: launch the card removal purchase ---
             // OnTryPurchaseWrapper calls DoLocalMerchantCardRemoval which opens a
@@ -87,21 +77,17 @@ public static class ShopRemoveCardHandler
             var screen = StateHandler.DetectScreen();
             Logger.Info($"After requesting card removal, detected screen: {screen}");
 
-            return new
+            return Responses.Ok(new
             {
-                ok = true,
-                data = new
-                {
-                    action = "SHOP_REMOVE_CARD",
-                    cost = entry.Cost,
-                    screen
-                }
-            };
+                action = "SHOP_REMOVE_CARD",
+                cost = entry.Cost,
+                screen
+            });
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to buy card removal: {ex.Message}");
-            return new { ok = false, error = "INTERNAL_ERROR", message = ex.Message };
+            return Responses.Error("INTERNAL_ERROR", ex.Message);
         }
     }
 
