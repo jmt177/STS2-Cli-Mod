@@ -2,7 +2,6 @@
 
 ## Language Policy
 
-- Communicate with the user in Chinese (中文).
 - All code, comments, documentation, commit messages, and scripts must be in English.
 
 A CLI control mod for Slay the Spire 2. Two independent .NET 9 / C# 12 projects communicating via Named Pipe with JSON messages.
